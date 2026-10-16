@@ -1,0 +1,3514 @@
+---
+title: "RAE_Project_Code_5517177"
+format:
+  pdf:
+    geometry:
+      - landscape
+      - margin=1.5cm
+editor: visual
+execute:
+  eval: false
+  echo: true
+---
+
+## Set-up
+
+```{r}
+rm(list=ls())
+library(readstata13)
+library(dplyr)
+library(tidyverse)
+library(purrr)
+library(scales)
+library(modelsummary)
+library(knitr)
+library(fixest)
+library(broom)
+
+setwd("/Users/enzowei/Documents/Warwick/3rd Year/RAE Dissertation/Running environment")
+SDD_SALSUS_2000to2018 <- c("salsus2002.dta",
+                "sdd02engarchive.dta",
+                "salsus2004.dta",
+                "sdd04_eng_archive.dta",
+                "sdd06_eng_archive.dta",
+                "salsus_2006_data.dta",
+                "sdd08_pupil_data.dta",
+                "sdd10_archive.dta",
+                "salsus_2008_to_ukda.dta",
+                "salsus_2010_to_ukda.dta",
+                "salsus_2013_ukda.dta",
+                "sdd13_for_data_archive.dta",
+                "salsus_2018_for_ukda.dta",
+                "sdd_dataforarchive_2018.dta",
+                "sdd00dataeng.dta",
+                "salsus00datascot.dta")
+
+for (x in SDD_SALSUS_2000to2018) {
+  df_name <- sub("\\.dta$", "", basename(x))
+  assign(df_name, read.dta13(x), envir = .GlobalEnv)
+}
+
+salsus_trend_data_1990_to_2013 <- read.dta13("salsus_trend_data_1990_to_2013.dta")
+```
+
+## Survey year and country variables
+
+```{r}
+salsus00datascot$survey_year <- 2000
+sdd00dataeng$survey_year <- 2000
+salsus2002$survey_year <- 2002
+sdd02engarchive$survey_year <- 2002
+salsus2004$survey_year <- 2004
+sdd04_eng_archive$survey_year <- 2004
+sdd06_eng_archive$survey_year <- 2006
+salsus_2006_data$survey_year <- 2006
+sdd08_pupil_data$survey_year <- 2008
+sdd10_archive$survey_year <- 2010
+salsus_2008_to_ukda$survey_year <- 2008
+salsus_2010_to_ukda$survey_year <- 2010
+salsus_2013_ukda$survey_year <- 2013
+sdd13_for_data_archive$survey_year <- 2013
+salsus_2018_for_ukda$survey_year <- 2018
+sdd_dataforarchive_2018$survey_year <- 2018
+
+salsus00datascot$country <- "Scotland"
+sdd00dataeng$country <- "England"
+salsus2002$country <- "Scotland"
+sdd02engarchive$country <- "England"
+salsus2004$country <- "Scotland"
+sdd04_eng_archive$country <- "England"
+sdd06_eng_archive$country <- "England"
+salsus_2006_data$country <- "Scotland"
+sdd08_pupil_data$country <- "England"
+sdd10_archive$country <- "England"
+salsus_2008_to_ukda$country <- "Scotland"
+salsus_2010_to_ukda$country <- "Scotland"
+salsus_2013_ukda$country <- "Scotland"
+sdd13_for_data_archive$country <- "England"
+salsus_2018_for_ukda$country <- "Scotland"
+sdd_dataforarchive_2018$country <- "England"
+```
+
+## Variables extraction
+
+### \[Year 2000\]
+
+#### Scotland
+
+```{r}
+#2000
+#Scotland
+year2000_scotland <- salsus00datascot %>%
+  transmute(
+    country,
+    survey_year,
+    age             = age1115,
+    truant_raw      = truant,
+    gender_raw      = sex,
+    schoolstage_raw = syear,
+    smokernow_raw   = cgnow,
+    smokestat_raw   = cgstat,
+    cgfamn_raw      = cgfamn,
+    cgfams_raw      = cgfams,
+    cgfamz_raw      = cgfamz,
+    drinkfreq_raw   = alfreq,
+    everdrink_raw   = alevr,
+    ethnicity_raw   = ethnic,
+    druguse_raw     = ddgyr
+  ) %>%
+  mutate(
+    truant = case_when(
+      truant_raw == "yes" ~ 1,
+      truant_raw == "no" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "boy" ~ 1,
+      gender_raw == "girl" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "year 7" ~ "year 7/P7/age 10~11",
+      schoolstage_raw == "year 8/s1" ~ "year 8/S1/age 11~12",
+      schoolstage_raw == "year 9/s2" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "year 10/s3" ~ "year 10/S3/age 13~14",
+      schoolstage_raw == "year 11/s4" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+    
+    smokernow = case_when(
+      smokernow_raw == "yes" ~ 1,
+      smokernow_raw == "no" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      smokestat_raw == "i have never smoked" ~ "Never smoked",
+      smokestat_raw == "i have only ever tried smoking once" ~ "Tried smoking",
+      smokestat_raw == "i used to smoke sometimes but i never smoke a cigarette now" ~ "Used to smoke",
+      smokestat_raw == "i sometimes smoke cigarettes now but i don't smoke as many a" ~ "Occasional smoker (<1/week)",
+      smokestat_raw == "i usually smoke between one and six cigarettes a week" ~ "Regular smoker (1-6/week)",
+      smokestat_raw == "i usually smoke more than six cigarettes a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "yes" ~ 1,
+      everdrink_raw == "no" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      drinkfreq_raw == "i never drink alcohol now" ~ "Never",
+      everdrink_raw == "no" ~ "Never",
+      drinkfreq_raw == "only a few times a year" ~ "Few times a year",
+      drinkfreq_raw == "about once a month" ~ "Once a month",
+      drinkfreq_raw == "about once a fortnight" ~ "Once a fortnight",
+      drinkfreq_raw == "about once a week" ~ "Once a week",
+      drinkfreq_raw == "about twice a week" ~ "Twice a week",
+      drinkfreq_raw == "almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    ethnicity = case_when(
+      ethnicity_raw == "white" ~ "White",
+      ethnicity_raw == "mixed" ~ "Mixed",
+      ethnicity_raw %in% c("asian or asian british", "chinese") ~ "Asian",
+      ethnicity_raw == "black or black british" ~ "Black",
+      ethnicity_raw == "Other" ~ "Other",
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamn_raw = case_when(
+      cgfamn_raw %in% c("not answered (9)", "item not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfamn_raw)
+    ),
+    cgfams_raw = case_when(
+      cgfams_raw %in% c("not answered (9)", "item not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfams_raw)
+    ),
+    cgfamz_raw = case_when(
+      cgfamz_raw %in% c("not answered (9)", "item not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfamz_raw)
+    ),
+    
+    cgfamatt_raw = case_when(
+      !is.na(cgfamn_raw) ~ cgfamn_raw,
+      !is.na(cgfams_raw) & cgfams_raw != "they don't know i smoke" ~ cgfams_raw,
+      cgfams_raw == "they don't know i smoke" ~ cgfamz_raw,
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamatt = case_when(
+      cgfamatt_raw %in% c("they would stop me",
+                          "they stop me",
+                          "they try to persuade me not to smoke",
+                          "they would try to persuade me not to smoke") ~ "Negative",
+      cgfamatt_raw %in% c("they do nothing",
+                          "they would do nothing")  ~ "Neutral",
+      cgfamatt_raw %in% c("they encourage me to smoke",
+                          "they would encourage me to smoke")  ~ "Positive",
+      cgfamatt_raw %in% c("i don't know") ~ "Don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      druguse_raw == 1 ~ 1,
+      druguse_raw == 2 ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+```
+
+#### England
+
+```{r}
+#England
+year2000_england <- sdd00dataeng %>%
+  transmute(
+    country,
+    survey_year,
+    age             = age1115,
+    truant_raw      = truant,
+    gender_raw      = sex,
+    schoolstage_raw = syear,
+    smokernow_raw   = cgnow,
+    smokestat_raw   = cgstat,
+    cgfamn_raw      = cgfamn,
+    cgfams_raw      = cgfams,
+    cgfamz_raw      = cgfamz,
+    drinkfreq_raw   = alfreq,
+    everdrink_raw   = alevr,
+    ethnicity_raw   = ethnic,
+    druguse_raw     = ddgyr
+  ) %>%
+  mutate(
+    truant = case_when(
+      truant_raw == "yes" ~ 1,
+      truant_raw == "no" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "boy" ~ 1,
+      gender_raw == "girl" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "year 7" ~ "year 7/P7/age 10~11",
+      schoolstage_raw == "year 8/s1" ~ "year 8/S1/age 11~12",
+      schoolstage_raw == "year 9/s2" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "year 10/s3" ~ "year 10/S3/age 13~14",
+      schoolstage_raw == "year 11/s4" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+    
+    smokernow = case_when(
+      smokernow_raw == "yes" ~ 1,
+      smokernow_raw == "no" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      smokestat_raw == "i have never smoked" ~ "Never smoked",
+      smokestat_raw == "i have only ever tried smoking once" ~ "Tried smoking",
+      smokestat_raw == "i used to smoke sometimes but i never smoke a cigarette now" ~ "Used to smoke",
+      smokestat_raw == "i sometimes smoke cigarettes now but i don't smoke as many a" ~ "Occasional smoker (<1/week)",
+      smokestat_raw == "i usually smoke between one and six cigarettes a week" ~ "Regular smoker (1-6/week)",
+      smokestat_raw == "i usually smoke more than six cigarettes a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "yes" ~ 1,
+      everdrink_raw == "no" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      drinkfreq_raw == "i never drink alcohol now" ~ "Never",
+      everdrink_raw == "no" ~ "Never",
+      drinkfreq_raw == "only a few times a year" ~ "Few times a year",
+      drinkfreq_raw == "about once a month" ~ "Once a month",
+      drinkfreq_raw == "about once a fortnight" ~ "Once a fortnight",
+      drinkfreq_raw == "about once a week" ~ "Once a week",
+      drinkfreq_raw == "about twice a week" ~ "Twice a week",
+      drinkfreq_raw == "almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    ethnicity = case_when(
+      ethnicity_raw == "white" ~ "White",
+      ethnicity_raw == "mixed" ~ "Mixed",
+      ethnicity_raw %in% c("asian or asian british", "chinese") ~ "Asian",
+      ethnicity_raw == "black or black british" ~ "Black",
+      ethnicity_raw == "Other" ~ "Other",
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamn_raw = case_when(
+      cgfamn_raw %in% c("not answered (9)", "item not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfamn_raw)
+    ),
+    cgfams_raw = case_when(
+      cgfams_raw %in% c("not answered (9)", "item not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfams_raw)
+    ),
+    cgfamz_raw = case_when(
+      cgfamz_raw %in% c("not answered (9)", "item not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfamz_raw)
+    ),
+    
+    cgfamatt_raw = case_when(
+      !is.na(cgfamn_raw) ~ cgfamn_raw,
+      !is.na(cgfams_raw) & cgfams_raw != "they don't know i smoke" ~ cgfams_raw,
+      cgfams_raw == "they don't know i smoke" ~ cgfamz_raw,
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamatt = case_when(
+      cgfamatt_raw %in% c("they would stop me",
+                          "they stop me",
+                          "they try to persuade me not to smoke",
+                          "they would try to persuade me not to smoke") ~ "Negative",
+      cgfamatt_raw %in% c("they do nothing",
+                          "they would do nothing")  ~ "Neutral",
+      cgfamatt_raw %in% c("they encourage me to smoke",
+                          "they would encourage me to smoke")  ~ "Positive",
+      cgfamatt_raw %in% c("i don't know") ~ "Don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      druguse_raw == 1 ~ 1,
+      druguse_raw == 2 ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+```
+
+### \[Year 2002\]
+
+#### Scotland
+
+```{r}
+#2002
+#Scotland
+year2002_scotland <- salsus2002 %>%
+  transmute(
+    country,
+    survey_year,
+    truant_raw      = truant,
+    gender_raw      = sex,
+    schoolstage_raw = classyr,
+    smokernow_raw   = cgnow,
+    smokestat_raw   = cgstat,
+    cgfamn_raw      = cgfamn,
+    cgfams_raw      = cgfams,
+    cgfamz_raw      = cgfamz,
+    dcgfam_raw      = dcgfam,
+    everdrink_raw   = alevr,
+    drinkfreq_raw   = alfreq,
+    ethnicity_raw   = dethgrp,
+    druguse_raw     = ddgyr
+  ) %>%
+  
+  #measurement bias adjusted
+  mutate(
+    truant = case_when(
+      truant_raw %in% c("3 times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("None at all",
+                        "Once",
+                        "Twice") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    #alternative strict truant recoding
+    alt_truant = case_when(
+      truant_raw %in% c("Once",
+                        "Twice",
+                        "3 times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("None at all") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "male" ~ 1,
+      gender_raw == "female" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "S2" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "S4" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+    
+    smokernow = case_when(
+      smokernow_raw == 1 ~ 1,
+      smokernow_raw == 2 ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      tolower(smokestat_raw) == "i have never smoked" ~ "Never smoked",
+      tolower(smokestat_raw) == "i have only ever tried smoking once" ~ "Tried smoking",
+      tolower(smokestat_raw) == "i used to smoke sometimes but not now" ~ "Used to smoke",
+      tolower(smokestat_raw) == "i sometimes smoke but not as many as 1 a week" ~ "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == "i usually smoke between 1 and 6 cigarettes a week" ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == "i usually smoke more than 6 cigarettes a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "Yes" ~ 1,
+      everdrink_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(drinkfreq_raw) == "i never drink alcohol now" ~ "Never",
+      everdrink_raw          == "No" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    ethnicity = case_when(
+      ethnicity_raw == "White" ~ "White",
+      ethnicity_raw == "Mixed" ~ "Mixed",
+      tolower(ethnicity_raw) %in% c("india", 
+                                    "chinese", 
+                                    "pakistani",
+                                    "bangladeshi") ~ "Asian",
+      tolower(ethnicity_raw) %in% c("black african",
+                                    "black caribbean",
+                                    "black other") ~ "Black",
+      ethnicity_raw == "Other" ~ "Other",
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamn_raw = case_when(
+      cgfamn_raw %in% c("not answered", "not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfamn_raw)
+    ),
+    cgfams_raw = case_when(
+      cgfams_raw %in% c("not answered", "not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfams_raw)
+    ),
+    cgfamz_raw = case_when(
+      cgfamz_raw %in% c("not answered", "not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfamz_raw)
+    ),
+    
+    cgfamatt = case_when(
+      dcgfam_raw %in% c("they would stop me",
+                         "persuade me not to") ~ "Negative",
+      dcgfam_raw %in% c("do nothing")  ~ "Neutral",
+      dcgfam_raw %in% c("encourage me")  ~ "Positive",
+      dcgfam_raw %in% c("not sure") ~ "Don't know",
+      TRUE ~ NA_character_
+    ),
+
+    druguse = case_when(
+      druguse_raw == 1 ~ 1,
+      druguse_raw == 2 ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+```
+
+#### England
+
+```{r}
+#England
+year2002_england <- sdd02engarchive %>%
+  transmute(
+    country,
+    survey_year,
+    age             = age1115,
+    truant_raw      = truant,
+    gender_raw      = sex,
+    schoolstage_raw = syear,
+    smokernow_raw   = cgnow,
+    smokestat_raw   = cgstat,
+    cgfamn_raw      = cgfamn,
+    cgfams_raw      = cgfams,
+    cgfamz_raw      = cgfamz,
+    dcgfam_raw      = dcgfam,
+    everdrink_raw   = alevr,
+    drinkfreq_raw   = alfreq,
+    ethnicity_raw   = ethnic,
+    druguse_raw     = ddgyr
+  ) %>%
+  
+  mutate(
+    truant = case_when(
+      truant_raw %in% c("yes") ~ 1,
+      truant_raw %in% c("no") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "boy" ~ 1,
+      gender_raw == "girl" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "year 7" ~ "year 7/P7/age 10~11",
+      schoolstage_raw == "year 8" ~ "year 8/S1/age 11~12",
+      schoolstage_raw == "year 9" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "year 10" ~ "year 10/S3/age 13~14",
+      schoolstage_raw == "year 11" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+    
+    smokernow = case_when(
+      smokernow_raw == "yes" ~ 1,
+      smokernow_raw == "no" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      tolower(smokestat_raw) == "i have never smoked" ~ "Never smoked",
+      tolower(smokestat_raw) == "i have only ever tried smoking once" ~ "Tried smoking",
+      tolower(smokestat_raw) == "i used to smoke sometimes but i never smoke a cigarette now" ~ "Used to smoke",
+      tolower(smokestat_raw) == "i sometimes smoke cigarettes now but i don't smoke as many a" ~ "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == "i usually smoke between one and six cigarettes a week" ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == "i usually smoke more than six cigarettes a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "yes" ~ 1,
+      everdrink_raw == "no" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(drinkfreq_raw) == "i never drink alcohol now" ~ "Never",
+      tolower(everdrink_raw) == "no" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    ethnicity = case_when(
+      tolower(ethnicity_raw) == "white" ~ "White",
+      tolower(ethnicity_raw) == "mixed" ~ "Mixed",
+      tolower(ethnicity_raw) %in% c("asian or asian british", 
+                                    "chinese") ~ "Asian",
+      tolower(ethnicity_raw) %in% c("black or black british") ~ "Black",
+      tolower(ethnicity_raw) == "other" ~ "Other",
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamn_raw = case_when(
+      cgfamn_raw %in% c("not answered (9)", "item not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfamn_raw)
+    ),
+    cgfams_raw = case_when(
+      cgfams_raw %in% c("not answered (9)", "item not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfams_raw)
+    ),
+    cgfamz_raw = case_when(
+      cgfamz_raw %in% c("not answered (9)", "item not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfamz_raw)
+    ),
+    
+    cgfamatt = case_when(
+      dcgfam_raw %in% c("1",
+                        "2") ~ "Negative",
+      dcgfam_raw %in% c("3")  ~ "Neutral",
+      dcgfam_raw %in% c("4")  ~ "Positive",
+      dcgfam_raw %in% c("5") ~ "Don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      druguse_raw == 1 ~ 1,
+      druguse_raw == 2 ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+```
+
+### \[Year 2004\]
+
+#### Scotland
+
+```{r}
+#2004
+#Scotland
+year2004_scotland <- salsus2004 %>%
+  transmute(
+    country,
+    survey_year,
+    truant_raw      = truant,
+    gender_raw      = sex,
+    schoolstage_raw = classyr,
+    smokernow_raw   = cgnow,
+    smokestat_raw   = cgstat,
+    cgfamn_raw      = cgfamn,
+    cgfams_raw      = cgfams,
+    cgfamz_raw      = cgfamz,
+    dcgfam_raw      = dcgfam,
+    everdrink_raw   = alevr,
+    drinkfreq_raw   = alfreq,
+    ethnicity_raw   = dethgrp,
+    druguse_raw     = ddgyr
+  ) %>%
+  
+  #measurement bias adjusted
+  mutate(
+    truant = case_when(
+      truant_raw %in% c("3  times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("Not at all",
+                        "Once",
+                        "Twice") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    #alternative strict truant recoding
+    alt_truant = case_when(
+      truant_raw %in% c("Once",
+                        "Twice",
+                        "3 times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("Not at all" ) ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "Boy" ~ 1,
+      gender_raw == "Girl" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "Secondary 2" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "Secondary 4" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+    
+    smokernow = case_when(
+      smokernow_raw == "Yes" ~ 1,
+      smokernow_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      tolower(smokestat_raw) == "i have never smoked" ~ "Never smoked",
+      tolower(smokestat_raw) == "i have only ever tried smoking once" ~ "Tried smoking",
+      tolower(smokestat_raw) == "i used to smoke but never smoke now" ~ "Used to smoke",
+      tolower(smokestat_raw) == "i sometimes smoke but not as many as one a week" ~
+                                "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == "i smoke between one and six cigarettes a week" ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == "i smoke more than six cigarettes a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "Yes" ~ 1,
+      everdrink_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(drinkfreq_raw) == "i never drink alcohol now" ~ "Never",
+      tolower(everdrink_raw) == "no" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    ethnicity = case_when(
+      ethnicity_raw == "White" ~ "White",
+      ethnicity_raw == "Mixed" ~ "Mixed",
+      tolower(ethnicity_raw) %in% c("indian", 
+                                    "chinese", 
+                                    "pakistani",
+                                    "bangladeshi") ~ "Asian",
+      tolower(ethnicity_raw) %in% c("black african",
+                                    "black caribbean",
+                                    "black other") ~ "Black",
+      ethnicity_raw == "Other" ~ "Other",
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamn_raw = case_when(
+      cgfamn_raw %in% c("not answered", "not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfamn_raw)
+    ),
+    cgfams_raw = case_when(
+      cgfams_raw %in% c("not answered", "not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfams_raw)
+    ),
+    cgfamz_raw = case_when(
+      cgfamz_raw %in% c("not answered", "not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfamz_raw)
+    ),
+    
+    cgfamatt = case_when(
+      dcgfam_raw %in% c("they would stop me",
+                         "persuade me not to") ~ "Negative",
+      dcgfam_raw %in% c("do nothing")  ~ "Neutral",
+      dcgfam_raw %in% c("encourage me")  ~ "Positive",
+      dcgfam_raw %in% c("not sure") ~ "Don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      druguse_raw == 1 ~ 1,
+      druguse_raw == 2 ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+```
+
+#### England
+
+```{r}
+#England
+year2004_england <- sdd04_eng_archive %>%
+  transmute(
+    country,
+    survey_year,
+    age             = age1115,
+    truant_raw      = truant,
+    gender_raw      = sex,
+    schoolstage_raw = syear,
+    smokernow_raw   = cgnow,
+    smokestat_raw   = cgstat,
+    cgfamn_raw      = cgfamn,
+    cgfams_raw      = cgfams,
+    cgfamz_raw      = cgfamz,
+    dcgfam_raw      = dcgfam,
+    everdrink_raw   = alevr,
+    drinkfreq_raw   = alfreq,
+    ethnicity_raw   = ethnic,
+    druguse_raw     = ddgyr
+  ) %>%
+  
+  mutate(
+    truant = case_when(
+      truant_raw %in% c("yes") ~ 1,
+      truant_raw %in% c("no") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "boy" ~ 1,
+      gender_raw == "girl" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "year 7" ~ "year 7/P7/age 10~11",
+      schoolstage_raw == "year 8" ~ "year 8/S1/age 11~12",
+      schoolstage_raw == "year 9" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "year 10" ~ "year 10/S3/age 13~14",
+      schoolstage_raw == "year 11" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+    
+    smokernow = case_when(
+      smokernow_raw == "yes" ~ 1,
+      smokernow_raw == "no" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      tolower(smokestat_raw) == "i have never smoked" ~ "Never smoked",
+      tolower(smokestat_raw) == "i have only ever tried smoking once" ~ "Tried smoking",
+      tolower(smokestat_raw) == "i used to smoke sometimes but never now" ~ "Used to smoke",
+      tolower(smokestat_raw) == "sometimes smoke but not as many as one a week" ~ "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == "i smoke between one and six a week" ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == "i usually smoke more than six a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "yes" ~ 1,
+      everdrink_raw == "no" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(drinkfreq_raw) == "i never drink alcohol now" ~ "Never",
+      tolower(everdrink_raw) == "no" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "every day or almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    ethnicity = case_when(
+      tolower(ethnicity_raw) == "white" ~ "White",
+      tolower(ethnicity_raw) == "mixed" ~ "Mixed",
+      tolower(ethnicity_raw) %in% c("chinese",
+                                    "asian or asian british") ~ "Asian",
+      tolower(ethnicity_raw) %in% c("black or black british") ~ "Black",
+      tolower(ethnicity_raw) == "other" ~ "Other",
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamn_raw = case_when(
+      cgfamn_raw %in% c("not applicable", "not answered", "don't know") ~ NA_character_,
+      TRUE ~ as.character(cgfamn_raw)
+    ),
+    cgfams_raw = case_when(
+      cgfams_raw %in% c("not applicable", "not answered", "don't know") ~ NA_character_,
+      TRUE ~ as.character(cgfams_raw)
+    ),
+    cgfamz_raw = case_when(
+      cgfamz_raw %in% c("not applicable", "not answered", "don't know") ~ NA_character_,
+      TRUE ~ as.character(cgfamz_raw)
+    ),
+    
+    cgfamatt = case_when(
+      dcgfam_raw %in% c("try to stop me",
+                        "try to persuade me to stop") ~ "Negative",
+      dcgfam_raw %in% c("do nothing")  ~ "Neutral",
+      dcgfam_raw %in% c("encourage me to smoke")  ~ "Positive",
+      dcgfam_raw %in% c("don't know_(5)") ~ "Don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      druguse_raw == "used drugs" ~ 1,
+      druguse_raw == "not used" ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+```
+
+### \[Year 2006\]
+
+#### Scotland
+
+```{r}
+#2006
+#Scotland
+year2006_scotland <- salsus_2006_data %>%
+  transmute(
+    country,
+    survey_year,
+    age             = Age,
+    truant_raw      = truant1,
+    gender_raw      = sex,
+    schoolstage_raw = classyr,
+    smokernow_raw   = cgnow,
+    smokestat_raw   = cgstat,
+    cgfamn_raw      = cgfamn,
+    cgfams_raw      = cgfams,
+    cgfamz_raw      = cgfamz,
+    dcgfam_raw      = dcgfam,
+    everdrink_raw   = alevr,
+    drinkfreq_raw   = alfreq,
+    #ethnicity is multi-variable
+    scottish,
+    english,
+    welsh,
+    irish,
+    british,
+    whoth,
+    indian,
+    pakist,
+    bangla,
+    chinese,
+    asiaoth,
+    blkcar,
+    blkafr,
+    blkother,
+    mixed,
+    otheth,
+    ethdk,
+    druguse_raw     = ddgyr
+  ) %>%
+  
+  #measurement bias adjusted truant
+  mutate(
+    truant = case_when(
+      truant_raw %in% c("3 times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("Not at all",
+                        "Once",
+                        "Twice") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+  #alternative strict truant recoding
+    alt_truant = case_when(
+      truant_raw %in% c("Once",
+                        "Twice",
+                        "3 times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("Not at all") ~ 0,
+      TRUE ~ NA_real_
+    ),
+  
+    gender = case_when(
+      gender_raw == "Boy" ~ 1,
+      gender_raw == "Girl" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "S2" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "S4" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+    
+    smokernow = case_when(
+      smokernow_raw == "Yes" ~ 1,
+      smokernow_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      tolower(smokestat_raw) == "never smoked" ~ "Never smoked",
+      tolower(smokestat_raw) == "only tried once" ~ "Tried smoking",
+      tolower(smokestat_raw) == "used to smoke but not now" ~ "Used to smoke",
+      tolower(smokestat_raw) == "sometimes smoke, less than one a week" ~
+                                "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == "smoke one to six cigarettes a week" ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == "smoke more than six cigarettes a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "Yes" ~ 1,
+      everdrink_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(drinkfreq_raw) == "never drink alcohol now" ~ "Never",
+      tolower(everdrink_raw) == "no" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    ethnicity = case_when(
+      scottish == "Ticked" ~ "White",
+      english == "Ticked" ~ "White",
+      welsh == "Ticked" ~ "White",
+      irish == "Ticked" ~ "White",
+      british == "Ticked" ~ "White",
+      whoth == "Ticked" ~ "White",
+      scottish == "Ticked" ~ "White",
+      indian == "Ticked" ~ "Asian",
+      pakist == "Ticked" ~ "Asian",
+      bangla == "Ticked" ~ "Asian",
+      chinese == "Ticked" ~ "Asian",
+      asiaoth == "Ticked" ~ "Asian",
+      blkcar == "Ticked" ~ "Black",
+      blkafr == "Ticked" ~ "Black",
+      blkother == "Ticked" ~ "Black",
+      mixed == "Ticked" ~ "Mixed",
+      otheth == "Ticked" ~ "Other",
+      ethdk == "Ticked" ~ NA_character_,
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamn_raw = case_when(
+      cgfamn_raw %in% c("Not answered_(-9)", "Not applicable_(-1)") ~ NA_character_,
+      TRUE ~ as.character(cgfamn_raw)
+    ),
+    cgfams_raw = case_when(
+      cgfams_raw %in% c("Not answered_(-9)", "Not applicable_(-1)") ~ NA_character_,
+      TRUE ~ as.character(cgfams_raw)
+    ),
+    cgfamz_raw = case_when(
+      cgfamz_raw %in% c("Not answered_(-9)", "Not applicable_(-1)") ~ NA_character_,
+      TRUE ~ as.character(cgfamz_raw)
+    ),
+    
+    cgfamatt = case_when(
+      dcgfam_raw %in% c(1,
+                        2) ~ "Negative",
+      dcgfam_raw %in% c(3)  ~ "Neutral",
+      dcgfam_raw %in% c(4)  ~ "Positive",
+      dcgfam_raw %in% c(5) ~ "Don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      druguse_raw == 1 ~ 1,
+      druguse_raw == 2 ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+```
+
+#### \*Scotland (trend dataset)
+
+```{r}
+#2006
+#Scotland (use the trend dataset)
+alt_year2006_scotland <- salsus_trend_data_1990_to_2013 %>%
+  filter(
+    year            == 2006
+  ) %>%
+  
+  transmute(
+    survey_year     = year,
+    truant_raw      = p_truant02,
+    gender_raw      = c_sex90,
+    schoolstage_raw = C_yeargroup90,
+    smokernow_raw   = s_smokenow90,
+    smokestat_raw   = s_smokefreq90,
+    #only family attitude to smoking for smokers
+    ethnicity_raw   = c_ethnicity06,
+    cgfamn_raw      = s_famn94,
+    cgfams_raw      = s_famview94,
+    cgfamz_raw      = s_famknew00,
+    everdrink_raw   = A_everdrink90,
+    drinkfreq_raw   = A_drinkfreq90,
+    druguse_raw     = d_takedrug98
+  ) %>%
+  
+  #measurement bias adjusted truant
+  mutate(
+    truant = case_when(
+      truant_raw %in% c("3 times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("Not at all",
+                        "Once",
+                        "Twice") ~ 0,
+      TRUE ~ NA_real_
+    ),
+  
+  #alternative strict truant recoding
+    alt_truant = case_when(
+      truant_raw %in% c("Once",
+                        "Twice",
+                        "3 times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("Not at all") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "Male" ~ 1,
+      gender_raw == "Female" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "S2" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "S4" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+
+   ethnicity_bin = case_when(
+     ethnicity_raw %in% c("White - Scottish",
+                          "White - Other",
+                          "White - British") ~ "White",
+     ethnicity_raw %in% c("Minority ethnic") ~ "Non-white",
+     TRUE ~ NA_character_
+   ),
+  
+    smokernow = case_when(
+      smokernow_raw == "Yes" ~ 1,
+      smokernow_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      tolower(smokestat_raw) == "i have never smoked" ~ "Never smoked",
+      tolower(smokestat_raw) == "i have only ever tried smoking once" ~ "Tried smoking",
+      tolower(smokestat_raw) == "i used to smoke sometimes but I never smoke a cigarette now" ~ "Used to smoke",
+      tolower(smokestat_raw) == "i sometimes smokes cigarettes now but I don't smoke as many as one a week" ~ "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == "i usually smoke between one and six cigarettes a week" ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == "i usually smoke more than six cigarettes a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "Yes" ~ 1,
+      everdrink_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(drinkfreq_raw) == "never had a drink" ~ "Never",
+      tolower(everdrink_raw) == "no" ~ "Never",
+      tolower(drinkfreq_raw) == "i never drink alcohol now" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamn_raw = case_when(
+      cgfamn_raw %in% c("not asked / not applicable", "not answered / refused") ~ NA_character_,
+      TRUE ~ as.character(cgfamn_raw)
+    ),
+    cgfams_raw = case_when(
+      cgfams_raw %in% c("not asked / not applicable", "not answered / refused") ~ NA_character_,
+      TRUE ~ as.character(cgfams_raw)
+    ),
+    cgfamz_raw = case_when(
+      cgfamz_raw %in% c("not asked / not applicable", "not answered / refused") ~ NA_character_,
+      TRUE ~ as.character(cgfamz_raw)
+    ),
+    
+    cgfamatt_raw = case_when(
+      !is.na(cgfamn_raw) ~ cgfamn_raw,
+      !is.na(cgfams_raw) & cgfams_raw != "They do not know I smoke" ~ cgfams_raw,
+      cgfams_raw == "They do not know I smoke" ~ cgfamz_raw,
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamatt = case_when(
+      cgfams_raw %in% c("Try to dissuade me/persuade me not to smoke",
+                        "They stop me") ~ "Negative",
+      cgfams_raw %in% c("They do nothing")  ~ "Neutral",
+      cgfams_raw %in% c("They encourage me")  ~ "Positive",
+      cgfams_raw %in% c("Dont know") ~ "Don't know",
+      cgfams_raw %in% c("They do not know I smoke") ~ "They don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      druguse_raw %in% c("Never taken any drugs",
+                         "Taken any drugs in the last month",
+                         "Taken any drugs in the last year") ~ 1,
+      druguse_raw %in% c("Never taken any drugs",
+                         "Taken any drugs more than a year ago") ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+```
+
+#### England
+
+```{r}
+#2006
+#England
+year2006_england <- sdd06_eng_archive %>%
+  transmute(
+    country,
+    survey_year,
+    age             = age1115,
+    truant_raw      = truantdv,
+    gender_raw      = sex,
+    schoolstage_raw = syear,
+    smokernow_raw   = cgnow,
+    smokestat_raw   = cgstat,
+    cgfamn_raw      = cgfamn,
+    cgfams_raw      = cgfams,
+    cgfamz_raw      = cgfamz,
+    dcgfam_raw      = dcgfam,
+    everdrink_raw   = alevr,
+    drinkfreq_raw   = alfreq,
+    ethnicity_raw   = ethnic,
+    druguse_raw     = ddgyr
+  ) %>%
+  
+  mutate(
+    truant = case_when(
+      truant_raw %in% c("truanted in last 12m") ~ 1,
+      truant_raw %in% c("never truanted") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "boy" ~ 1,
+      gender_raw == "girl" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == 7 ~ "year 7/P7/age 10~11",
+      schoolstage_raw == 8 ~ "year 8/S1/age 11~12",
+      schoolstage_raw == 9 ~ "year 9/S2/age 12~13",
+      schoolstage_raw == 10 ~ "year 10/S3/age 13~14",
+      schoolstage_raw == 11 ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+    
+    smokernow = case_when(
+      smokernow_raw == "yes" ~ 1,
+      smokernow_raw == "no" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      tolower(smokestat_raw) == "never smoked" ~ "Never smoked",
+      tolower(smokestat_raw) == "tried smoking once" ~ "Tried smoking",
+      tolower(smokestat_raw) == "used to smoke never smoke a cigarette now" ~ "Used to smoke",
+      tolower(smokestat_raw) == "sometimes smoke but not one a week" ~ "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == "usually 1-6 a week" ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == "usually more than 6 a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "yes" ~ 1,
+      everdrink_raw == "no" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(drinkfreq_raw) == "i never drink alcohol now" ~ "Never",
+      tolower(everdrink_raw) == "no" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "every day or almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    ethnicity = case_when(
+      tolower(ethnicity_raw) %in% c("white british",
+                                    "white irish",
+                                    "other white")~ "White",
+      tolower(ethnicity_raw) %in% c("white and black caribbean",
+                                    "white and black african",
+                                    "white and asian",
+                                    "other mixed") ~ "Mixed",
+      tolower(ethnicity_raw) %in% c("chinese",
+                                    "indian",
+                                    "pakistani",
+                                    "bangladeshi",
+                                    "other asian") ~ "Asian",
+      tolower(ethnicity_raw) %in% c("caribbean",
+                                    "african",
+                                    "other black") ~ "Black",
+      tolower(ethnicity_raw) %in% c("other ethnic") ~ "Other",
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamn_raw = case_when(
+      cgfamn_raw %in% c("not applicable", "not answered", "don't know (5)") ~ NA_character_,
+      TRUE ~ as.character(cgfamn_raw)
+    ),
+    cgfams_raw = case_when(
+      cgfams_raw %in% c("not applicable", "not answered", "don't know (5)") ~ NA_character_,
+      TRUE ~ as.character(cgfams_raw)
+    ),
+    cgfamz_raw = case_when(
+      cgfamz_raw %in% c("not applicable", "not answered", "don't know (5)") ~ NA_character_,
+      TRUE ~ as.character(cgfamz_raw)
+    ),
+    
+    cgfamatt = case_when(
+      dcgfam_raw %in% c("try to stop me",
+                        "try to persuade me to stop") ~ "Negative",
+      dcgfam_raw %in% c("do nothing")  ~ "Neutral",
+      dcgfam_raw %in% c("encourage me to smoke")  ~ "Positive",
+      dcgfam_raw %in% c("don't know") ~ "Don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      druguse_raw == "used drugs" ~ 1,
+      druguse_raw == "not used" ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+```
+
+### \[Year 2008\]
+
+#### Scotland
+
+```{r}
+#2008
+#Scotland
+year2008_scotland <- salsus_2008_to_ukda %>%
+  transmute(
+    country,
+    survey_year,
+    age             = Age,
+    truant_raw      = truant1,
+    gender_raw      = sex,
+    schoolstage_raw = classyr,
+    smokernow_raw   = cgnow,
+    smokestat_raw   = cgstat,
+    cgfamn_raw      = cgfamn,
+    cgfams_raw      = cgfams,
+    cgfamz_raw      = cgfamz,
+    everdrink_raw   = alevr,
+    drinkfreq_raw   = alfreq,
+    #ethnicity is multi-variable
+    scottish,
+    english,
+    welsh,
+    irish,
+    gtrav,
+    polish,
+    nirish,
+    british,
+    whoth,
+    indian,
+    pakist,
+    bangla,
+    chinese,
+    asianoth,
+    blkcar,
+    blkafr,
+    blkscbr,
+    blkother,
+    mixed,
+    otharab,
+    otheth,
+    ethdk,
+    #drug used is defined by many variables
+    dgtake,
+    dgfqcan,
+    dgfqgas,
+    dgfqamp,
+    dgfqlsd,
+    dgfqecs,
+    dgfqsem,
+    dgfqpop,
+    dgfqtrn,
+    dgfqher,
+    dgfqmsh,
+    dgfqmth,
+    dgfqcrk,
+    dgfqcok,
+    dgfqana,
+    dgfqoth
+  ) %>%
+  
+  #measurement bias adjusted truant
+  mutate(
+    truant = case_when(
+      truant_raw %in% c(4,
+                        5,
+                        6,
+                        7,
+                        8) ~ 1,
+      truant_raw %in% c(1,
+                        2,
+                        3) ~ 0,
+      TRUE ~ NA_real_
+    ),
+  
+  #alternative strict truant recoding
+    alt_truant = case_when(
+      truant_raw %in% c(2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8) ~ 1,
+      truant_raw %in% c(1) ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == 1 ~ 1,
+      gender_raw == 2 ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "Secondary 2" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "Secondary 4" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+    
+    smokernow = case_when(
+      smokernow_raw == "Yes" ~ 1,
+      smokernow_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      tolower(smokestat_raw) == 1 ~ "Never smoked",
+      tolower(smokestat_raw) == 2 ~ "Tried smoking",
+      tolower(smokestat_raw) == 3 ~ "Used to smoke",
+      tolower(smokestat_raw) == 4 ~ "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == 5 ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == 6 ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "Yes" ~ 1,
+      everdrink_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(drinkfreq_raw) == "never had a drink" ~ "Never",
+      tolower(everdrink_raw) == "no" ~ "Never",
+      tolower(drinkfreq_raw) == "i never drink alcohol now" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    ethnicity = case_when(
+      scottish == 1 ~ "White",
+      english == 1 ~ "White",
+      welsh == 1 ~ "White",
+      irish == 1 ~ "White",
+      gtrav == 1 ~ "White",
+      polish == 1 ~ "White",
+      british == 1 ~ "White",
+      nirish == 1 ~ "White",
+      whoth == 1 ~ "White",
+      indian == 1 ~ "Asian",
+      pakist == 1 ~ "Asian",
+      bangla == 1 ~ "Asian",
+      chinese == 1 ~ "Asian",
+      asianoth == 1 ~ "Asian",
+      blkcar == 1 ~ "Black",
+      blkafr == 1 ~ "Black",
+      blkscbr == 1 ~ "Black",
+      blkother == 1 ~ "Black",
+      mixed == 1 ~ "Mixed",
+      otharab == 1 ~ "Other",
+      otheth == 1 ~ "Other",
+      ethdk == 1 ~ NA_character_,
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamn_raw = case_when(
+      cgfamn_raw %in% c(-1, 98) ~ NA_real_,
+      TRUE ~ as.integer(cgfamn_raw)
+    ),
+    cgfams_raw = case_when(
+      cgfams_raw %in% c(-1, 98) ~ NA_real_,
+      TRUE ~ as.integer(cgfams_raw)
+    ),
+    cgfamz_raw = case_when(
+      cgfamz_raw %in% c(-1, 98) ~ NA_real_,
+      TRUE ~ as.integer(cgfamz_raw)
+    ),
+    
+    cgfamatt_raw = case_when(
+      !is.na(cgfamn_raw) ~ cgfamn_raw,
+      !is.na(cgfams_raw) & cgfams_raw != 6 ~ cgfams_raw,
+      cgfams_raw == 6 ~ cgfamz_raw,
+      TRUE ~ NA_real_
+    ),
+    
+    cgfamatt = case_when(
+      cgfamatt_raw %in% c(1,
+                          2) ~ "Negative",
+      cgfamatt_raw %in% c(3)  ~ "Neutral",
+      cgfamatt_raw %in% c(4)  ~ "Positive",
+      cgfamatt_raw %in% c(5) ~ "Don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      rowSums(across(c(dgfqcan, dgfqgas, dgfqamp, dgfqlsd, dgfqecs,
+                       dgfqsem, dgfqpop, dgfqtrn, dgfqher, dgfqmsh,
+                       dgfqmth, dgfqcrk, dgfqcok, dgfqana, dgfqoth),
+                     ~ . %in% c(1, 2)), na.rm = TRUE) > 0 ~ 1,
+      rowSums(across(c(dgfqcan, dgfqgas, dgfqamp, dgfqlsd, dgfqecs,
+                       dgfqsem, dgfqpop, dgfqtrn, dgfqher, dgfqmsh,
+                       dgfqmth, dgfqcrk, dgfqcok, dgfqana, dgfqoth),
+                     ~ . %in% c(3, 4)), na.rm = TRUE) > 0 ~ 0,
+      dgtake == 2 ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+```
+
+#### \*Scotland (trend dataset)
+
+```{r}
+#2008
+#Scotland (use the trend dataset)
+alt_year2008_scotland <- salsus_trend_data_1990_to_2013 %>%
+  filter(
+    year            == 2008
+  ) %>%
+  
+  transmute(
+    survey_year     = year,
+    truant_raw      = p_truant02,
+    gender_raw      = c_sex90,
+    schoolstage_raw = C_yeargroup90,
+    smokernow_raw   = s_smokenow90,
+    smokestat_raw   = s_smokefreq90,
+    #only family attitude to smoking for smokers
+    ethnicity_raw   = c_ethnicity06,
+    cgfamn_raw      = s_famn94,
+    cgfams_raw      = s_famview94,
+    cgfamz_raw      = s_famknew00,
+    everdrink_raw   = A_everdrink90,
+    drinkfreq_raw   = A_drinkfreq90,
+    druguse_raw     = d_takedrug98
+  ) %>%
+  
+  #measurement bias adjusted truant
+  mutate(
+    truant = case_when(
+      truant_raw %in% c("3 times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("Not at all",
+                        "Once",
+                        "Twice") ~ 0,
+      TRUE ~ NA_real_
+    ),
+  
+  #alternative strict truant recoding
+    alt_truant = case_when(
+      truant_raw %in% c("Once",
+                        "Twice",
+                        "3 times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("Not at all") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "Male" ~ 1,
+      gender_raw == "Female" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "S2" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "S4" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+    
+    smokernow = case_when(
+      smokernow_raw == "Yes" ~ 1,
+      smokernow_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+   ethnicity_bin = case_when(
+     ethnicity_raw %in% c("White - Scottish",
+                          "White - Other",
+                          "White - British") ~ "White",
+     ethnicity_raw %in% c("Minority ethnic") ~ "Non-white",
+     TRUE ~ NA_character_
+   ),
+      
+    smoking_status = case_when(
+      tolower(smokestat_raw) == "i have never smoked" ~ "Never smoked",
+      tolower(smokestat_raw) == "i have only ever tried smoking once" ~ "Tried smoking",
+      tolower(smokestat_raw) == "i used to smoke sometimes but i never smoke a cigarette now" ~ "Used to smoke",
+      tolower(smokestat_raw) == "i sometimes smokes cigarettes now but i don't smoke as many as one a week" ~ "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == "i usually smoke between one and six cigarettes a week" ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == "i usually smoke more than six cigarettes a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "Yes" ~ 1,
+      everdrink_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(drinkfreq_raw) == "never had a drink" ~ "Never",
+      tolower(everdrink_raw) == "no" ~ "Never",
+      tolower(drinkfreq_raw) == "i never drink alcohol now" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamn_raw = case_when(
+      cgfamn_raw %in% c("not asked / not applicable", "not answered / refused") ~ NA_character_,
+      TRUE ~ as.character(cgfamn_raw)
+    ),
+    cgfams_raw = case_when(
+      cgfams_raw %in% c("not asked / not applicable", "not answered / refused") ~ NA_character_,
+      TRUE ~ as.character(cgfams_raw)
+    ),
+    cgfamz_raw = case_when(
+      cgfamz_raw %in% c("not asked / not applicable", "not answered / refused") ~ NA_character_,
+      TRUE ~ as.character(cgfamz_raw)
+    ),
+    
+    cgfamatt_raw = case_when(
+      !is.na(cgfamn_raw) ~ cgfamn_raw,
+      !is.na(cgfams_raw) & cgfams_raw != "They do not know I smoke" ~ cgfams_raw,
+      cgfams_raw == "They do not know I smoke" ~ cgfamz_raw,
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamatt = case_when(
+      cgfams_raw %in% c("Try to dissuade me/persuade me not to smoke",
+                        "They stop me") ~ "Negative",
+      cgfams_raw %in% c("They do nothing")  ~ "Neutral",
+      cgfams_raw %in% c("They encourage me")  ~ "Positive",
+      cgfams_raw %in% c("Dont know") ~ "Don't know",
+      cgfams_raw %in% c("They do not know I smoke") ~ "They don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      druguse_raw %in% c("Never taken any drugs",
+                         "Taken any drugs in the last month",
+                         "Taken any drugs in the last year") ~ 1,
+      druguse_raw %in% c("Never taken any drugs",
+                         "Taken any drugs more than a year ago") ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+```
+
+#### England
+
+```{r}
+#2008
+#England
+year2008_england <- sdd08_pupil_data %>%
+  transmute(
+    country,
+    survey_year,
+    age             = age1115,
+    truant_raw      = truant,
+    gender_raw      = sex,
+    schoolstage_raw = syear,
+    smokernow_raw   = cgnow,
+    smokestat_raw   = cgstat,
+    cgfamn_raw      = cgfamn,
+    cgfams_raw      = cgfams,
+    cgfamz_raw      = cgfamz,
+    dcgfam_raw      = dcgfam,
+    everdrink_raw   = alevr,
+    drinkfreq_raw   = alfreq,
+    ethnicity_raw   = ethnicgp,
+    druguse_raw     = ddgyr
+  ) %>%
+  
+  mutate(
+    truant = case_when(
+      truant_raw %in% c("yes") ~ 1,
+      truant_raw %in% c("no") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "boy" ~ 1,
+      gender_raw == "girl" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "year 7" ~ "year 7/P7/age 10~11",
+      schoolstage_raw == "year 8" ~ "year 8/S1/age 11~12",
+      schoolstage_raw == "year 9" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "year 10" ~ "year 10/S3/age 13~14",
+      schoolstage_raw == "year 11" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+    
+    smokernow = case_when(
+      smokernow_raw == "yes" ~ 1,
+      smokernow_raw == "no" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      tolower(smokestat_raw) == "i have never smoked" ~ "Never smoked",
+      tolower(smokestat_raw) == "i have only ever tried smoking once" ~ "Tried smoking",
+      tolower(smokestat_raw) == "i used to smoke but never now" ~ "Used to smoke",
+      tolower(smokestat_raw) == "i sometimes smoke but not as many as one a week" ~ "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == "i usually smoke between one and six a week" ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == "i usually smoke more than six a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "yes" ~ 1,
+      everdrink_raw == "no" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(drinkfreq_raw) == "i never drink alcohol now" ~ "Never",
+      tolower(everdrink_raw) == "no" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "every day or almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    ethnicity = case_when(
+      tolower(ethnicity_raw) %in% c("white")~ "White",
+      tolower(ethnicity_raw) %in% c("mixed") ~ "Mixed",
+      tolower(ethnicity_raw) %in% c("chinese",
+                                    "asian") ~ "Asian",
+      tolower(ethnicity_raw) %in% c("black") ~ "Black",
+      tolower(ethnicity_raw) %in% c("other ethnic") ~ "Other",
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamn_raw = case_when(
+      cgfamn_raw %in% c("not applicable", "not answered", "don't know (5)") ~ NA_character_,
+      TRUE ~ as.character(cgfamn_raw)
+    ),
+    cgfams_raw = case_when(
+      cgfams_raw %in% c("not applicable", "not answered", "don't know (5)") ~ NA_character_,
+      TRUE ~ as.character(cgfams_raw)
+    ),
+    cgfamz_raw = case_when(
+      cgfamz_raw %in% c("not applicable", "not answered", "don't know (5)") ~ NA_character_,
+      TRUE ~ as.character(cgfamz_raw)
+    ),
+    
+    cgfamatt = case_when(
+      dcgfam_raw %in% c("they would try to stop me",
+                        "they would try to persuade me to stop") ~ "Negative",
+      dcgfam_raw %in% c("they would do nothing")  ~ "Neutral",
+      dcgfam_raw %in% c("they would encourage me to smoke")  ~ "Positive",
+      dcgfam_raw %in% c("i don't know") ~ "Don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      druguse_raw == "used drugs" ~ 1,
+      druguse_raw == "not used" ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+```
+
+### \[Year 2010\]
+
+#### Scotland
+
+```{r}
+#2010
+#Scotland (use the trend dataset)
+year2010_scotland <- salsus_trend_data_1990_to_2013 %>%
+  filter(
+    year            == 2010
+  ) %>%
+  
+  transmute(
+    survey_year     = year,
+    truant_raw      = p_truant02,
+    gender_raw      = c_sex90,
+    schoolstage_raw = C_yeargroup90,
+    smokernow_raw   = s_smokenow90,
+    smokestat_raw   = s_smokefreq90,
+    #only family attitude to smoking for smokers
+    ethnicity_raw   = c_ethnicity06,
+    cgfams_raw      = s_famview94,
+    everdrink_raw   = A_everdrink90,
+    drinkfreq_raw   = A_drinkfreq90,
+    druguse_raw     = d_takedrug98
+  ) %>%
+  
+  #measurement bias adjusted truant
+  mutate(
+    truant = case_when(
+      truant_raw %in% c("3 times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("Not at all",
+                        "Once",
+                        "Twice") ~ 0,
+      TRUE ~ NA_real_
+    ),
+  
+  #alternative strict truant recoding
+    alt_truant = case_when(
+      truant_raw %in% c("Once",
+                        "Twice",
+                        "3 times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("Not at all") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "Male" ~ 1,
+      gender_raw == "Female" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "S2" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "S4" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+
+   ethnicity_bin = case_when(
+     ethnicity_raw %in% c("White - Scottish",
+                          "White - Other",
+                          "White - British") ~ "White",
+     ethnicity_raw %in% c("Minority ethnic") ~ "Non-white",
+     TRUE ~ NA_character_
+   ),
+    
+    smokernow = case_when(
+      smokernow_raw == "Yes" ~ 1,
+      smokernow_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      tolower(smokestat_raw) == "i have never smoked" ~ "Never smoked",
+      tolower(smokestat_raw) == "i have only ever tried smoking once" ~ "Tried smoking",
+      tolower(smokestat_raw) == "i used to smoke sometimes but i never smoke a cigarette now" ~ "Used to smoke",
+      tolower(smokestat_raw) == "i sometimes smokes cigarettes now but i don't smoke as many as one a week" ~ "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == "i usually smoke between one and six cigarettes a week" ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == "i usually smoke more than six cigarettes a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "Yes" ~ 1,
+      everdrink_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(drinkfreq_raw) == "never had a drink" ~ "Never",
+      tolower(everdrink_raw) == "no" ~ "Never",
+      tolower(drinkfreq_raw) == "i never drink alcohol now" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamatt_smoker = case_when(
+      cgfams_raw %in% c("Try to dissuade me/persuade me not to smoke",
+                        "They stop me") ~ "Negative",
+      cgfams_raw %in% c("They do nothing")  ~ "Neutral",
+      cgfams_raw %in% c("They encourage me")  ~ "Positive",
+      cgfams_raw %in% c("Dont know") ~ "Don't know",
+      cgfams_raw %in% c("They do not know I smoke") ~ "They don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      druguse_raw %in% c("Taken any drugs in the last month",
+                         "Taken any drugs in the last year") ~ 1,
+      druguse_raw %in% c("Never taken any drugs",
+                         "Taken any drugs more than a year ago") ~ 0,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  mutate(
+    country = "Scotland"
+  )
+```
+
+#### England
+
+```{r}
+#2010
+#England
+year2010_england <- sdd10_archive %>%
+  transmute(
+    country,
+    survey_year,
+    age             = age1115,
+    truant_raw      = Truant,
+    gender_raw      = Sex,
+    schoolstage_raw = Syear,
+    smokernow_raw   = CgNow,
+    smokestat_raw   = CgStat,
+    cgfamn_raw      = CgFamN,
+    cgfams_raw      = CgFamS,
+    cgfamz_raw      = CgFamZ,
+    dcgfam_raw      = Dcgfam,
+    everdrink_raw   = AlEvr,
+    drinkfreq_raw   = AlFreq,
+    #no ethnicity
+    druguse_raw     = ddgyr
+  ) %>%
+  
+  mutate(
+    truant = case_when(
+      truant_raw %in% c("Yes") ~ 1,
+      truant_raw %in% c("No") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "Boy" ~ 1,
+      gender_raw == "Girl" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "Year 7" ~ "year 7/P7/age 10~11",
+      schoolstage_raw == "Year 8" ~ "year 8/S1/age 11~12",
+      schoolstage_raw == "Year 9" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "Year 10" ~ "year 10/S3/age 13~14",
+      schoolstage_raw == "Year 11" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+    
+    smokernow = case_when(
+      smokernow_raw == "Yes" ~ 1,
+      smokernow_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      tolower(smokestat_raw) == "i have never smoked" ~ "Never smoked",
+      tolower(smokestat_raw) == "i have only ever tried smoking once" ~ "Tried smoking",
+      tolower(smokestat_raw) == "i used to smoke but never now" ~ "Used to smoke",
+      tolower(smokestat_raw) == "i sometimes smoke but not as many as one a week" ~ "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == "i usually smoke between one and six a week" ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == "i usually smoke more than six a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "Yes" ~ 1,
+      everdrink_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(drinkfreq_raw) == "i never drink alcohol now" ~ "Never",
+      tolower(everdrink_raw) == "no" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "every day or almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamn_raw = case_when(
+      cgfamn_raw %in% c("Not applicable", "Not answered", "Dont know") ~ NA_character_,
+      TRUE ~ as.character(cgfamn_raw)
+    ),
+    cgfams_raw = case_when(
+      cgfams_raw %in% c("Not applicable", "Not answered", "Dont know") ~ NA_character_,
+      TRUE ~ as.character(cgfams_raw)
+    ),
+    cgfamz_raw = case_when(
+      cgfamz_raw %in% c("Not applicable", "Not answered", "Dont know") ~ NA_character_,
+      TRUE ~ as.character(cgfamz_raw)
+    ),
+    
+    cgfamatt = case_when(
+      tolower(dcgfam_raw) %in% c("they would try to stop me",
+                                 "they would try to persuade me to stop") ~ "Negative",
+      tolower(dcgfam_raw) %in% c("they would do nothing")  ~ "Neutral",
+      tolower(dcgfam_raw) %in% c("they would encourage me to smoke")  ~ "Positive",
+      tolower(dcgfam_raw) %in% c("i don't know") ~ "Don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      druguse_raw == "Used drugs" ~ 1,
+      druguse_raw == "Not used" ~ 0,
+      TRUE ~ NA_real_
+    )
+  ) 
+```
+
+### \[Year 2013\]
+
+#### Scotland
+
+```{r}
+#2013
+#Scotland (use the trend dataset)
+year2013_scotland <- salsus_trend_data_1990_to_2013 %>%
+  filter(
+    year            == 2013
+  ) %>%
+  
+  transmute(
+    survey_year     = year,
+    truant_raw      = p_truant02,
+    gender_raw      = c_sex90,
+    schoolstage_raw = C_yeargroup90,
+    smokernow_raw   = s_smokenow90,
+    smokestat_raw   = s_smokefreq90,
+    #only family attitude to smoking for smokers
+    cgfams_raw      = s_famview94,
+    ethnicity_raw   = c_ethnicity06,
+    everdrink_raw   = A_everdrink90,
+    drinkfreq_raw   = A_drinkfreq90,
+    druguse_raw     = d_takedrug98
+  ) %>%
+  
+  #measurement bias adjusted truant
+  mutate(
+    truant = case_when(
+      truant_raw %in% c("3 times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("Not at all",
+                        "Once",
+                        "Twice") ~ 0,
+      TRUE ~ NA_real_
+    ),
+  
+  #alternative strict truant recoding
+    alt_truant = case_when(
+      truant_raw %in% c("Once",
+                        "Twice",
+                        "3 times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("Not at all") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "Male" ~ 1,
+      gender_raw == "Female" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "S2" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "S4" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+  
+   ethnicity_bin = case_when(
+     ethnicity_raw %in% c("White - Scottish",
+                          "White - Other",
+                          "White - British") ~ "White",
+     ethnicity_raw %in% c("Minority ethnic") ~ "Non-white",
+     TRUE ~ NA_character_
+   ),
+    
+    smokernow = case_when(
+      smokernow_raw == "Yes" ~ 1,
+      smokernow_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      tolower(smokestat_raw) == "i have never smoked" ~ "Never smoked",
+      tolower(smokestat_raw) == "i have only ever tried smoking once" ~ "Tried smoking",
+      tolower(smokestat_raw) == "i used to smoke sometimes but i never smoke a cigarette now" ~ "Used to smoke",
+      tolower(smokestat_raw) == "i sometimes smokes cigarettes now but i don't smoke as many as one a week" ~ "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == "i usually smoke between one and six cigarettes a week" ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == "i usually smoke more than six cigarettes a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "Yes" ~ 1,
+      everdrink_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(drinkfreq_raw) == "never had a drink" ~ "Never",
+      tolower(everdrink_raw) == "no" ~ "Never",
+      tolower(drinkfreq_raw) == "i never drink alcohol now" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+
+    cgfamatt_smoker = case_when(
+      cgfams_raw %in% c("Try to dissuade me/persuade me not to smoke",
+                        "They stop me") ~ "Negative",
+      cgfams_raw %in% c("They do nothing")  ~ "Neutral",
+      cgfams_raw %in% c("They encourage me")  ~ "Positive",
+      cgfams_raw %in% c("Dont know") ~ "Don't know",
+      cgfams_raw %in% c("They do not know I smoke") ~ "They don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      druguse_raw %in% c("Taken any drugs in the last month",
+                         "Taken any drugs in the last year") ~ 1,
+      druguse_raw %in% c("Never taken any drugs",
+                         "Taken any drugs more than a year ago") ~ 0,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  mutate(
+    country = "Scotland"
+  )
+```
+
+#### England
+
+```{r}
+#2013
+#England
+year2013_england <- sdd13_for_data_archive %>%
+  transmute(
+    country,
+    survey_year,
+    age             = age1115,
+    truant_raw      = Truant,
+    gender_raw      = Sex,
+    schoolstage_raw = SYear,
+    smokernow_raw   = CgNow,
+    smokestat_raw   = CgStat,
+    #no cgfam
+    everdrink_raw   = AlEvr,
+    drinkfreq_raw   = AlFreq,
+    #no ethnicity
+    druguse_raw     = ddgyr
+  ) %>%
+  
+  mutate(
+    truant = case_when(
+      truant_raw %in% c("Yes") ~ 1,
+      truant_raw %in% c("No") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "Boy" ~ 1,
+      gender_raw == "Girl" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "Year 7" ~ "year 7/P7/age 10~11",
+      schoolstage_raw == "Year 8" ~ "year 8/S1/age 11~12",
+      schoolstage_raw == "Year 9" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "Year 10" ~ "year 10/S3/age 13~14",
+      schoolstage_raw == "Year 11" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+    
+    smokernow = case_when(
+      smokernow_raw == "Yes" ~ 1,
+      smokernow_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      tolower(smokestat_raw) == "i have never smoked" ~ "Never smoked",
+      tolower(smokestat_raw) == "i have only ever tried smoking once" ~ "Tried smoking",
+      tolower(smokestat_raw) == "i used to smoke but never now" ~ "Used to smoke",
+      tolower(smokestat_raw) == "i smoke sometimes but not even one a week" ~ "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == "i usually smoke between one and six a week" ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == "i usually smoke more than six a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "Yes" ~ 1,
+      everdrink_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(drinkfreq_raw) == "i never drink alcohol now" ~ "Never",
+      tolower(everdrink_raw) == "no" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "every day or almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      druguse_raw == "Used drugs" ~ 1,
+      druguse_raw == "Not used" ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+```
+
+### \[Year 2018\]
+
+#### Scotland
+
+```{r}
+#2018
+#Scotland
+year2018_scotland <- salsus_2018_for_ukda %>%
+  transmute(
+    country,
+    survey_year,
+    truant_raw      = Truant1,
+    gender_raw      = sex,
+    schoolstage_raw = classyr,
+    smokernow_raw   = cgnow,
+    smokestat_raw   = cgstat,
+    #only family attitude to smoking for smokers
+    cgfams_raw      = cgfams,
+    everdrink_raw   = alevr,
+    drinkfreq_raw   = alfreq,
+    #no ethnicity
+    #drug used is defined by many variables
+    dgtake,
+    dgfcan,
+    dgfgas,
+    dgfamp,
+    dgfcrys,
+    dgflsd,
+    dgfecs,
+    dgfpop,
+    dgftrn,
+    dgfher,
+    dgfmsh,
+    dgfmth,
+    dgfcok,
+    dgfcrk, 
+    dgfana, 
+    dgfmph, 
+    dgfghb, 
+    dgfket, 
+    dgfspc, 
+    dgfsal, 
+    dgfmdma, 
+    dgfsyemp, 
+    dgfsystim, 
+    dgfsydiss,
+    dgfsypsy,
+    pstak, 
+    othdrgtak,
+  ) %>%
+  
+  #measurement bias adjusted truant
+  mutate(
+    truant = case_when(
+      truant_raw %in% c("3 times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("Not at all",
+                        "Once",
+                        "Twice",
+                        "Not answered") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+  #alternative strict truant recoding
+    alt_truant = case_when(
+      truant_raw %in% c("Once",
+                        "Twice",
+                        "3 times",
+                        "4 times",
+                        "5 times",
+                        "Between 6 and 10 times",
+                        "More than 10 times") ~ 1,
+      truant_raw %in% c("Not at all") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "Boy" ~ 1,
+      gender_raw == "Girl" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    schoolstage = case_when(
+      schoolstage_raw == "Secondary 2" ~ "year 9/S2/age 12~13",
+      schoolstage_raw == "Secondary 4" ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+    
+    smokernow = case_when(
+      smokernow_raw == "Yes" ~ 1,
+      smokernow_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    smoking_status = case_when(
+      tolower(smokestat_raw) == "i have never smoked" ~ "Never smoked",
+      tolower(smokestat_raw) == "i have only ever tried smoking once" ~ "Tried smoking",
+      tolower(smokestat_raw) == "i used to smoke sometimes but i never smoke a cigarette now" ~ "Used to smoke",
+      tolower(smokestat_raw) == "i sometimes smoke cigarettes now but i don't smoke as many as one a week" ~
+                                "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == "i usually smoke between one and six cigarettes a week" ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == "i usually smoke more than six cigarettes a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "Yes" ~ 1,
+      everdrink_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(everdrink_raw) == "no" ~ "Never",
+      tolower(drinkfreq_raw) == "i never drink alcohol now" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+
+    cgfamatt_smoker = case_when(
+      cgfams_raw %in% c("They stop me",
+                        "They try to persuade me not to smoke") ~ "Negative",
+      cgfams_raw %in% c("They do nothing")  ~ "Neutral",
+      cgfams_raw %in% c("They encourage me to smoke")  ~ "Positive",
+      cgfams_raw %in% c("I don't know") ~ "Don't know",
+      cgfams_raw %in% c("They do not know I smoke") ~ "They don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      rowSums(across(c(
+        dgfcan,
+    dgfgas,
+    dgfamp,
+    dgfcrys,
+    dgflsd,
+    dgfecs,
+    dgfpop,
+    dgftrn,
+    dgfher,
+    dgfmsh,
+    dgfmth,
+    dgfcok,
+    dgfcrk, 
+    dgfana, 
+    dgfmph, 
+    dgfghb, 
+    dgfket, 
+    dgfspc, 
+    dgfsal, 
+    dgfmdma, 
+    dgfsyemp, 
+    dgfsystim, 
+    dgfsydiss,
+    dgfsypsy,
+    pstak, 
+    othdrgtak),
+                   ~ . %in% c("In the last month", "In the last year")), na.rm = TRUE) > 0 ~ 1,
+      rowSums(across(c(dgfcan,
+    dgfgas,
+    dgfamp,
+    dgfcrys,
+    dgflsd,
+    dgfecs,
+    dgfpop,
+    dgftrn,
+    dgfher,
+    dgfmsh,
+    dgfmth,
+    dgfcok,
+    dgfcrk, 
+    dgfana, 
+    dgfmph, 
+    dgfghb, 
+    dgfket, 
+    dgfspc, 
+    dgfsal, 
+    dgfmdma, 
+    dgfsyemp, 
+    dgfsystim, 
+    dgfsydiss,
+    dgfsypsy,
+    pstak, 
+    othdrgtak),
+                     ~ . %in% c("More than a year ago", "Never")), na.rm = TRUE) > 0 ~ 0,
+    dgtake == "No" ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+```
+
+#### England
+
+```{r}
+#2018
+#England
+year2018_england <- sdd_dataforarchive_2018 %>%
+  transmute(
+    country,
+    survey_year,
+    age             = age1115,
+    truant_raw      = dtruant,
+    gender_raw      = sex,
+    #no school stage: use age
+    smokernow_raw   = cgnow,
+    smokestat_raw   = cgstat,
+    cgfamn_raw      = cgfamn,
+    cgfams_raw      = cgfams,
+    cgfamz_raw      = cgfamz,
+    dcgfam_raw      = dcgfam,
+    everdrink_raw   = alevr,
+    drinkfreq_raw   = alfreq,
+    ethnicity_raw   = ethnicgp5,
+    druguse_raw     = ddgyrany
+  ) %>%
+  
+  mutate(
+    truant = case_when(
+      truant_raw %in% c("Truanted in last 12 months") ~ 1,
+      truant_raw %in% c("Previously but not in last 12 months",
+                        "Never truanted") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    gender = case_when(
+      gender_raw == "Boy" ~ 1,
+      gender_raw == "Girl" ~ 0,
+      TRUE ~ NA_real_
+    ),
+
+    smokernow = case_when(
+      smokernow_raw == "Yes" ~ 1,
+      smokernow_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    schoolstage = case_when(
+      age == 11 ~ "year 7/P7/age 10~11",
+      age == 12 ~ "year 8/S1/age 11~12",
+      age == 13 ~ "year 9/S2/age 12~13",
+      age == 14 ~ "year 10/S3/age 13~14",
+      age == 15 ~ "year 11/S4/age 14~15+",
+      TRUE ~ NA_character_
+    ),
+    
+    smoking_status = case_when(
+      tolower(smokestat_raw) == "i have never smoked" ~ "Never smoked",
+      tolower(smokestat_raw) == "i have only ever tried smoking once" ~ "Tried smoking",
+      tolower(smokestat_raw) == "i used to smoke but never now" ~ "Used to smoke",
+      tolower(smokestat_raw) == "i smoke sometimes but not even one a week" ~ "Occasional smoker (<1/week)",
+      tolower(smokestat_raw) == "i usually smoke between one and six a week" ~ "Regular smoker (1-6/week)",
+      tolower(smokestat_raw) == "i usually smoke more than six a week" ~ "Regular smoker (>6/week)",
+      TRUE ~ NA_character_
+    ),
+    
+    everdrink = case_when(
+      everdrink_raw == "Yes" ~ 1,
+      everdrink_raw == "No" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    drinkfreq = case_when(
+      tolower(drinkfreq_raw) == "i never drink alcohol now" ~ "Never",
+      tolower(everdrink_raw) == "no" ~ "Never",
+      tolower(drinkfreq_raw) == "only a few times a year" ~ "Few times a year",
+      tolower(drinkfreq_raw) == "about once a month" ~ "Once a month",
+      tolower(drinkfreq_raw) == "about once a fortnight" ~ "Once a fortnight",
+      tolower(drinkfreq_raw) == "about once a week" ~ "Once a week",
+      tolower(drinkfreq_raw) == "about twice a week" ~ "Twice a week",
+      tolower(drinkfreq_raw) == "every day or almost every day" ~ "Everyday",
+      TRUE ~ NA_character_
+    ),
+    
+    ethnicity = case_when(
+      tolower(ethnicity_raw) %in% c("white")~ "White",
+      tolower(ethnicity_raw) %in% c("mixed") ~ "Mixed",
+      tolower(ethnicity_raw) %in% c("asian") ~ "Asian",
+      tolower(ethnicity_raw) %in% c("black") ~ "Black",
+      tolower(ethnicity_raw) %in% c("other") ~ "Other",
+      TRUE ~ NA_character_
+    ),
+    
+    cgfamn_raw = case_when(
+      cgfamn_raw %in% c("Not answered", "Dont know", "Not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfamn_raw)
+    ),
+    cgfams_raw = case_when(
+      cgfams_raw %in% c("Not answered", "Dont know", "Not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfams_raw)
+    ),
+    cgfamz_raw = case_when(
+      cgfamz_raw %in% c("Not answered", "Dont know", "Not applicable") ~ NA_character_,
+      TRUE ~ as.character(cgfamz_raw)
+    ),
+    
+    cgfamatt = case_when(
+      dcgfam_raw %in% c("Try to stop me",
+                        "Try to persuade me to stop") ~ "Negative",
+      dcgfam_raw %in% c("Do nothing")  ~ "Neutral",
+      dcgfam_raw %in% c("Encourage me to smoke")  ~ "Positive",
+      dcgfam_raw %in% c("Dont know_(5)") ~ "Don't know",
+      TRUE ~ NA_character_
+    ),
+    
+    druguse = case_when(
+      druguse_raw == "Used drugs" ~ 1,
+      druguse_raw == "Not used" ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+```
+
+## Combined dataset construction
+
+```{r}
+#rowbind
+keep_vars <- c("country", "survey_year", "truant",
+               "gender", "schoolstage", "age",
+               "cgfamatt", "druguse", "ethnicity",
+               "drinkfreq", "everdrink", "smokernow",
+               "smoking_status", "cgfamatt_smoker", "ethnicity_bin",
+               "alt_truant")
+
+df_selected <- list(#2000
+                    year2000_england,
+                    year2000_scotland,
+                    #2002
+                    year2002_england,
+                    year2002_scotland,
+                    #2004
+                    year2004_england,
+                    year2004_scotland,
+                    #2006
+                    year2006_england,
+                    year2006_scotland,
+                    #2008
+                    year2008_england,
+                    year2008_scotland,
+                    #2010
+                    year2010_england,
+                    year2010_scotland,
+                    #2013
+                    year2013_england,
+                    year2013_scotland,
+                    #2018
+                    year2018_england,
+                    year2018_scotland)
+
+sdd_salsus_all <- bind_rows(
+  lapply(df_selected, function(x) x %>% select(any_of(keep_vars)))
+)
+
+#variables creates
+sdd_salsus_all <- sdd_salsus_all %>%
+  mutate(
+    young_old = case_when(
+      schoolstage %in% c("year 7/P7/age 10~11",
+                        "year 8/S1/age 11~12",
+                        "year 9/S2/age 12~13") ~ "Younger",
+      schoolstage %in% c("year 10/S3/age 13~14",
+                         "year 11/S4/age 14~15+") ~ "Older",
+      TRUE ~ NA_character_
+    ),
+    ethnicity_bin = case_when(
+      ethnicity %in% c("Asian",
+                       "Black",
+                       "Other",
+                       "Non-white") ~ "Non-white",
+      ethnicity %in% c("White") ~ "White",
+      ethnicity_bin == "Non-white" ~ "Non-white",
+      ethnicity_bin == "White" ~ "White",
+      TRUE ~ NA_character_
+    ),
+    
+    drinkfreq_num = case_when(
+      drinkfreq == "Everyday" ~ 6,
+      drinkfreq == "Twice a week" ~ 5,
+      drinkfreq == "Once a week" ~ 4,
+      drinkfreq == "Once a fortnight" ~ 3,
+      drinkfreq == "Once a month" ~ 2,
+      drinkfreq == "Few times a year" ~ 1,
+      drinkfreq == "Never" ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    weekly_drinker = case_when(
+      drinkfreq %in% c("Everyday",
+                       "Twice a week",
+                       "Once a week") ~ 1,
+      drinkfreq %in% c("Once a fortnight",
+                       "Once a month",
+                       "Few times a year",
+                       "Never") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    weekly_smoker = case_when(
+      smoking_status %in% c("Regular smoker (>6/week)",
+                            "Regular smoker (1-6/week)") ~ 1,
+      smoking_status %in% c("Never smoked",
+                            "Occasional smoker (<1/week)",
+                            "Tried smoking",
+                            "Used to smoke") ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    alternative_truant = case_when(
+      alt_truant == 1 ~ 1,
+      alt_truant == 0 ~ 0,
+      is.na(alt_truant) & country %in% c("England") ~ truant,
+      TRUE ~ NA_real_
+    ),
+    
+    post = ifelse(survey_year >= 2013, 1, 0),
+    fixest_treatment = ifelse(country == "Scotland", 1, 0),
+    did = fixest_treatment * post
+  )
+```
+
+## Preliminary results
+
+### Appendix 1
+
+```{r}
+#truant
+prop.table(table(sdd_salsus_all$truant)) * 100
+table(sdd_salsus_all$truant)
+
+#alt_truant
+prop.table(table(sdd_salsus_all$alt_truant)) * 100
+table(sdd_salsus_all$alt_truant)
+
+#country
+prop.table(table(sdd_salsus_all$country)) * 100
+table(sdd_salsus_all$country)
+
+#survey_year
+prop.table(table(sdd_salsus_all$survey_year)) * 100
+table(sdd_salsus_all$survey_year)
+
+#gender
+prop.table(table(sdd_salsus_all$gender)) * 100
+table(sdd_salsus_all$gender)
+
+#schoolstage
+prop.table(table(sdd_salsus_all$schoolstage)) * 100
+table(sdd_salsus_all$schoolstage)
+
+#young_old
+prop.table(table(sdd_salsus_all$young_old)) * 100
+table(sdd_salsus_all$young_old)
+
+#smokernow
+prop.table(table(sdd_salsus_all$smokernow)) * 100
+table(sdd_salsus_all$smokernow)
+
+#druguse
+prop.table(table(sdd_salsus_all$druguse)) * 100
+table(sdd_salsus_all$druguse)
+
+#smoking_status
+prop.table(table(sdd_salsus_all$smoking_status)) * 100
+table(sdd_salsus_all$smoking_status)
+
+#drinkfreq
+prop.table(table(sdd_salsus_all$drinkfreq)) * 100
+table(sdd_salsus_all$drinkfreq)
+
+#everdrink
+prop.table(table(sdd_salsus_all$everdrink)) * 100
+table(sdd_salsus_all$everdrink)
+
+#weekly_drinker
+prop.table(table(sdd_salsus_all$weekly_drinker)) * 100
+table(sdd_salsus_all$weekly_drinker)
+
+#weekly_smoker
+prop.table(table(sdd_salsus_all$weekly_smoker)) * 100
+table(sdd_salsus_all$weekly_smoker)
+```
+
+### Observations table
+
+```{r}
+obs_table <- sdd_salsus_all %>%
+  group_by(country, survey_year) %>%
+  summarise(
+    obs_na_kept = n(),
+    obs_na_omit = sum(!is.na(truant)),
+    .groups = "drop"
+  ) %>%
+  arrange(country, survey_year)
+
+obs_table
+```
+
+### Sample statistics
+
+```{r}
+#sample overview
+sumstats <- sdd_salsus_all %>%
+  mutate(
+    ever = as.numeric(truant)   #ensures 0/1 numeric
+  ) %>%
+  group_by(country, survey_year) %>%
+  summarise(
+    N = sum(!is.na(ever)),
+    mean_ever = mean(ever, na.rm = TRUE),        #proportion
+    se = sqrt(mean_ever * (1 - mean_ever) / N),  #standard error of a proportion
+    ci_low = mean_ever - 1.96 * se,
+    ci_high = mean_ever + 1.96 * se,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    pct_ever = 100 * mean_ever,
+    ci_low_pct = 100 * ci_low,
+    ci_high_pct = 100 * ci_high
+  )
+
+sumstats
+```
+
+### Adolescents characteristics
+
+```{r}
+#gender share
+gender_share <- sdd_salsus_all %>%
+  group_by(country, survey_year) %>%
+  summarise(
+    N = sum(!is.na(gender)),
+    pct_female = 100 * mean(gender == 1, na.rm = TRUE),
+    pct_male   = 100 * mean(gender == 0, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+gender_share
+```
+
+### Truancy chart
+
+```{r}
+library(ggplot2)
+
+bar_plot_df <- sdd_salsus_all %>%
+  mutate(ever = as.numeric(truant)) %>%
+  group_by(country, survey_year) %>%
+  summarise(
+    n = sum(!is.na(ever)),
+    p = mean(ever, na.rm = TRUE),
+    se = sqrt(p * (1 - p) / n),
+    pct_truant = 100 * p,
+    ci_low = 100 * (p - 1.96 * se),
+    ci_high = 100 * (p + 1.96 * se),
+    .groups = "drop"
+  )
+
+ggplot(bar_plot_df, aes(x = factor(survey_year), y = pct_truant, fill = country)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_errorbar(
+    aes(ymin = ci_low, ymax = ci_high),
+    position = position_dodge(width = 0.8),
+    width = 0.3
+  ) +
+  geom_text(
+    aes(y = ci_high + 0.9, label = sprintf("%.1f", pct_truant)),
+    position = position_dodge(width = 0.8),
+    size = 3
+  ) +
+  labs(x = "Year", y = "% ever truant (last 12 months)", fill = NULL) +
+  ylim(0, max(bar_plot_df$ci_high + 1)) +
+  theme_minimal()
+```
+
+### Truancy vs. Drinking frequency
+
+```{r}
+sdd_salsus_all$drinkfreq <- factor(
+  sdd_salsus_all$drinkfreq,
+  levels = c(
+    "Never",
+    "Few times a year",
+    "Once a month",
+    "Once a fortnight",
+    "Once a week",
+    "Twice a week",
+    "Everyday"
+  )
+)
+
+freqtruancy_plot <- sdd_salsus_all %>%
+  group_by(country, drinkfreq) %>%
+  summarise(
+    n = sum(!is.na(truant)),
+    p = mean(truant, na.rm = TRUE),
+    se = sqrt(p * (1 - p) / n),
+    truancy_rate = p,
+    ci_low = p - 1.96 * se,
+    ci_high = p + 1.96 * se,
+    .groups = "drop"
+  )
+
+ggplot(freqtruancy_plot, aes(x = drinkfreq, y = truancy_rate, fill = country)) +
+  geom_col(position = position_dodge(width = 0.9)) +
+  geom_errorbar(
+    aes(ymin = ci_low, ymax = ci_high),
+    position = position_dodge(width = 0.9),
+    width = 0.2
+  ) +
+  geom_text(
+    aes(y = ci_high + 0.02, label = percent(truancy_rate, accuracy = 0.1)),
+    position = position_dodge(width = 0.9),
+    size = 4
+  ) +
+  scale_y_continuous(
+    labels = percent,
+    expand = expansion(mult = c(0, 0.12))
+  ) +
+  labs(x = "Drinking frequency", y = "% truant", fill = "Country")
+```
+
+### All variables summary statistics
+
+```{r}
+sum_df <- sdd_salsus_all %>%
+  transmute(
+    Truancy = truant,
+    `Alternative truancy` = alt_truant,
+    Boys = gender,
+    Younger = ifelse(young_old == "Younger", 1, 0),
+    `Smoke now` = smokernow,
+    `Drug use` = druguse,
+    `Ever drink` = everdrink,
+    `Weekly drinker` = weekly_drinker,
+    `Weekly smoker` = weekly_smoker
+  )
+
+sum_tab <- data.frame(
+  Variable = names(sum_df),
+  Mean = sapply(sum_df, function(x) mean(x, na.rm = TRUE)),
+  SD   = sapply(sum_df, function(x) sd(x, na.rm = TRUE)),
+  Min  = sapply(sum_df, function(x) min(x, na.rm = TRUE)),
+  Max  = sapply(sum_df, function(x) max(x, na.rm = TRUE)),
+  N    = sapply(sum_df, function(x) sum(!is.na(x)))
+)
+
+tab_code <- kable(sum_tab, format = "latex", booktabs = TRUE, digits = 2,
+      caption = "Summary statistics")
+cat(tab_code)
+```
+
+### Truancy broken down by characteristics
+
+```{r}
+
+bin_vars <- c(
+  "gender", "young_old", "smokernow", "druguse",
+  "everdrink", "weekly_drinker", "weekly_smoker"
+)
+
+var_labels <- c(
+  gender = "Boys",
+  young_old = "Younger",
+  smokernow = "Smoke now",
+  druguse = "Used Drugs",
+  everdrink = "Ever drink",
+  weekly_drinker = "Weekly drinker",
+  weekly_smoker = "Weekly smoker"
+)
+
+plot_df <- sdd_salsus_all %>%
+  mutate(
+    young_old = case_when(
+      young_old == "Younger" ~ 1,
+      young_old == "Older" ~ 0,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  select(country, truant, all_of(bin_vars)) %>%
+  pivot_longer(
+    cols = all_of(bin_vars),
+    names_to = "variable",
+    values_to = "value"
+  ) %>%
+  filter(!is.na(value), !is.na(truant)) %>%
+  group_by(country, variable, value) %>%
+  summarise(
+    n = sum(!is.na(truant)),
+    p = mean(truant, na.rm = TRUE),
+    se = sqrt(p * (1 - p) / n),
+    truancy_rate = p,
+    ci_low = p - 1.96 * se,
+    ci_high = p + 1.96 * se,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    variable = recode(variable, !!!var_labels),
+    label = percent(truancy_rate, accuracy = 1)
+  )
+
+gap <- 0.10
+strip_half <- 0.10
+
+plot_df <- plot_df %>%
+  mutate(
+    side_rate = ifelse(value == 1, -(truancy_rate + gap), truancy_rate + gap),
+    side_low  = ifelse(value == 1, -(ci_high + gap), ci_low + gap),
+    side_high = ifelse(value == 1, -(ci_low + gap), ci_high + gap),
+    label_x   = ifelse(value == 1, side_low - 0.03, side_high + 0.03)
+  )
+
+max_rate <- max(abs(c(plot_df$side_low, plot_df$side_high)), na.rm = TRUE)
+
+mid_labels <- plot_df %>%
+  distinct(variable)
+
+p <- ggplot(plot_df, aes(x = side_rate, y = variable, fill = country)) +
+  geom_col(
+    position = position_dodge(width = 0.72),
+    width = 0.6,
+    colour = "black",
+    linewidth = 0.2
+  ) +
+  geom_errorbar(
+    aes(xmin = side_low, xmax = side_high),
+    position = position_dodge(width = 0.72),
+    width = 0.18,
+    linewidth = 0.35
+  ) +
+  annotate(
+ "rect",
+    xmin = -strip_half, xmax = strip_half,
+  ymin = -Inf, ymax = Inf,
+    fill = "white",
+    colour = "black",
+    linewidth = 0.4
+  ) +
+  geom_vline(xintercept = -gap, linewidth = 0.4, linetype = "dashed") +
+  geom_vline(xintercept =  gap, linewidth = 0.4, linetype = "dashed") +
+  geom_text(
+   data = mid_labels,
+    aes(x = 0, y = variable, label = variable),
+    inherit.aes = FALSE,
+    size = 3.5
+  ) +
+  geom_text(
+    aes(x = label_x, label = label),
+  position = position_dodge(width = 0.72),
+    size = 3.3
+  ) +
+  annotate(
+    "text",
+    x = -gap - 0.14, y = Inf,
+    label = "Yes", vjust = 1.5, size = 4.5
+  ) +
+  annotate(
+    "text",
+    x = gap + 0.14, y = Inf,
+    label = "No", vjust = 1.5, size = 4.5
+  ) +
+  scale_x_continuous(
+    limits = c(-(max_rate + 0.06), max_rate + 0.06),
+    breaks = c(-0.2 - gap, -gap, gap, 0.2 + gap),
+    labels = c("20%", "0%", "0%", "20%")
+  ) +
+  labs(x = NULL, y = NULL, fill = NULL) +
+  coord_cartesian(clip = "off") +
+  theme_minimal(base_size = 13) +
+  theme(
+  axis.text.y = element_blank(),
+  panel.grid.major.y = element_blank(),
+   panel.grid.minor = element_blank(),
+    legend.position = "right",
+  plot.margin = margin(20, 50, 20, 50)
+  )
+
+p
+```
+
+## Pooled DiD/TWFE average effect regression
+
+### No controls
+
+```{r}
+#linear
+pooldid_linear_raw <- feols(
+  truant ~ did | country + survey_year,
+  data = sdd_salsus_all, vcov = "hetero"
+)
+summary(pooldid_linear_raw)
+
+#probit
+pooldid_probit_raw <- feglm(
+  truant ~ did | country + survey_year,
+  data = sdd_salsus_all, family = "probit", vcov = "hetero"
+)
+summary(pooldid_probit_raw)
+
+#logit
+pooldid_logit_raw <- feglm(
+  truant ~ did | country + survey_year,
+  data = sdd_salsus_all, family = "logit", vcov = "hetero"
+)
+summary(pooldid_logit_raw)
+```
+
+### Baseline with gender and younger/older
+
+```{r}
+#linear
+pooldid_linear_baseline <- feols(
+  truant ~ did + gender + young_old| country + survey_year,
+  data = sdd_salsus_all, vcov = "hetero"
+)
+
+summary(pooldid_linear_baseline)
+
+#probit
+pooldid_probit_baseline <- feglm(
+  truant ~ did + gender + young_old| country + survey_year,
+  data = sdd_salsus_all, family = "probit", vcov = "hetero"
+)
+
+summary(pooldid_probit_baseline)
+
+#logit
+pooldid_logit_baseline <- feglm(
+  truant ~ did + gender + young_old| country + survey_year,
+  data = sdd_salsus_all, family = "logit", vcov = "hetero"
+)
+
+summary(pooldid_logit_baseline)
+```
+
+### With risk behavioural control
+
+```{r}
+#linear
+pooldid_linear_control <- feols(
+  truant ~ did + gender + young_old + smokernow + druguse | country + survey_year,
+  data = sdd_salsus_all, vcov = "hetero"
+)
+
+summary(pooldid_linear_control)
+
+#probit
+pooldid_probit_control <- feglm(
+  truant ~ did + gender + young_old + smokernow + druguse | country + survey_year,
+  data = sdd_salsus_all, family = "probit", vcov = "hetero"
+)
+
+summary(pooldid_probit_control)
+#logit
+pooldid_logit_control <- feglm(
+  truant ~ did + gender + young_old + smokernow + druguse | country + survey_year,
+  data = sdd_salsus_all, family = "logit", vcov = "hetero"
+)
+
+summary(pooldid_logit_control)
+```
+
+### Restricted sample \[Exclude SALSUS 2018\]
+
+```{r}
+#raw
+#linear
+pooldid_linear_raw_restrict <- feols(
+  truant ~ did | country + survey_year,
+  data = sdd_salsus_all, subset = (sdd_salsus_all$survey_year != 2018), vcov = "hetero"
+)
+summary(pooldid_linear_raw_restrict)
+
+#probit
+pooldid_probit_raw_restrict <- feglm(
+  truant ~ did | country + survey_year,
+  data = sdd_salsus_all, family = "probit", subset = (sdd_salsus_all$survey_year != 2018), vcov = "hetero"
+)
+summary(pooldid_probit_raw_restrict)
+
+#logit
+pooldid_logit_raw_restrict <- feglm(
+  truant ~ did | country + survey_year,
+  data = sdd_salsus_all, family = "logit", subset = (sdd_salsus_all$survey_year != 2018), vcov = "hetero"
+)
+summary(pooldid_logit_raw_restrict)
+
+#baseline
+#linear
+pooldid_linear_baseline_restrict <- feols(
+  truant ~ did + gender + young_old| country + survey_year,
+  data = sdd_salsus_all, subset = (sdd_salsus_all$survey_year != 2018), vcov = "hetero"
+)
+summary(pooldid_linear_baseline_restrict)
+
+#probit
+pooldid_probit_baseline_restrict <- feglm(
+  truant ~ did + gender + young_old| country + survey_year,
+  data = sdd_salsus_all, family = "probit", subset = (sdd_salsus_all$survey_year != 2018), vcov = "hetero"
+)
+summary(pooldid_probit_baseline_restrict)
+#logit
+pooldid_logit_baseline_restrict <- feglm(
+  truant ~ did + gender + young_old| country + survey_year,
+  data = sdd_salsus_all, family = "logit", subset = (sdd_salsus_all$survey_year != 2018), vcov = "hetero"
+)
+summary(pooldid_logit_baseline_restrict)
+
+#control
+#linear
+pooldid_linear_control_restrict <- feols(
+  truant ~ did + gender + young_old + smokernow + druguse | country + survey_year,
+  data = sdd_salsus_all, subset = (sdd_salsus_all$survey_year != 2018), vcov = "hetero"
+)
+
+summary(pooldid_linear_control_restrict)
+
+#probit
+pooldid_probit_control_restrict <- feglm(
+  truant ~ did + gender + young_old + smokernow + druguse | country + survey_year,
+  data = sdd_salsus_all, family = "probit", subset = (sdd_salsus_all$survey_year != 2018), vcov = "hetero"
+)
+
+summary(pooldid_probit_control_restrict)
+#logit
+pooldid_logit_control_restrict <- feglm(
+  truant ~ did + gender + young_old + smokernow + druguse | country + survey_year,
+  data = sdd_salsus_all, family = "logit", subset = (sdd_salsus_all$survey_year != 2018), vcov = "hetero"
+)
+
+summary(pooldid_logit_control_restrict)
+```
+
+### Pooled DiD using alternative truancy recoding
+
+```{r}
+#raw
+#linear
+altpooldid_linear_raw_restrict <- feols(
+  alternative_truant ~ did | country + survey_year,
+  data = sdd_salsus_all, subset = (sdd_salsus_all$survey_year != 2018), vcov = "hetero"
+)
+summary(altpooldid_linear_raw_restrict)
+
+#baseline
+#linear
+altpooldid_linear_baseline_restrict <- feols(
+  alternative_truant ~ did + gender + young_old| country + survey_year,
+  data = sdd_salsus_all, subset = (sdd_salsus_all$survey_year != 2018), vcov = "hetero"
+)
+summary(altpooldid_linear_baseline_restrict)
+
+#control
+#linear
+altpooldid_linear_control_restrict <- feols(
+  alternative_truant ~ did + gender + young_old + smokernow + druguse | country + survey_year,
+  data = sdd_salsus_all, subset = (sdd_salsus_all$survey_year != 2018), vcov = "hetero"
+)
+
+summary(altpooldid_linear_control_restrict)
+```
+
+## Donald and Lang (2007) inference
+
+### Single estimate
+
+```{r}
+
+#1.Define treatment timing
+
+# Adjust this if you define post differently.
+# If 2010 is the reference/policy year and 2013+ is post:
+post_years <- c(2013, 2018)
+
+# Main outcome
+outcome_var <- "truant"
+
+
+
+#2.Collapse to country-year means
+
+
+country_year <- sdd_salsus_all %>%
+  filter(
+    country %in% c("England", "Scotland"),
+    !is.na(.data[[outcome_var]]),
+    !is.na(survey_year)
+  ) %>%
+  group_by(country, survey_year) %>%
+  summarise(
+    y_mean = mean(.data[[outcome_var]], na.rm = TRUE),
+    n = n(),
+    .groups = "drop"
+  )
+
+country_year
+
+#3.Create Scotland - England gap
+
+dl_gap <- country_year %>%
+  select(country, survey_year, y_mean) %>%
+  pivot_wider(
+    names_from = country,
+    values_from = y_mean
+  ) %>%
+  arrange(survey_year) %>%
+  mutate(
+    gap_scot_eng = Scotland - England
+  )
+
+dl_gap
+
+#4.First-difference the gap
+
+
+dl_fd <- dl_gap %>%
+  arrange(survey_year) %>%
+  mutate(
+    fd_gap = gap_scot_eng - lag(gap_scot_eng),
+    fd_year = paste0(lag(survey_year), "-", survey_year),
+    
+    # This equals 1 for the first change into the post-treatment period.
+    # For your data, this will usually be 2010-2013 if 2013 is first post year.
+    dl_treat = ifelse(survey_year == min(post_years), 1, 0)
+  ) %>%
+  filter(!is.na(fd_gap))
+
+dl_fd
+
+
+#5.Donald-Lang baseline model, First-difference gap, no intercept
+
+dl_model_no_intercept <- lm(fd_gap ~ 0 + dl_treat, data = dl_fd)
+
+summary(dl_model_no_intercept)
+tidy(dl_model_no_intercept, conf.int = TRUE)
+```
+
+## Event-study model
+
+```{r}
+library(fixest)
+```
+
+### Baseline specification
+
+#### \[Linear model\]
+
+```{r}
+#baseline linear
+fe_linear_baseline <- feols(truant ~ i(survey_year, fixest_treatment, ref = 2010) | country + survey_year, data = sdd_salsus_all, vcov = "hetero")
+summary(fe_linear_baseline)
+
+iplot(fe_linear_baseline, ref.line = 0,
+      xlab = "Year",
+      ylab = "Effect on truant (pp, ref=2010)",
+      main = "LPM Event-study no control")
+```
+
+#### \[Probit model\]
+
+```{r}
+#fe probit raw
+fe_probit_baseline <- feglm(truant ~ i(survey_year, fixest_treatment, ref = 2010) | country + survey_year, data = sdd_salsus_all, family = binomial(link="probit"), vcov = "hetero")
+summary(fe_probit_baseline)
+
+iplot(fe_probit_baseline, ref.line = 0,
+      xlab = "Year",
+      ylab = "Effect on truant (pp, ref=2010)",
+      main = "Event-study: 2010 Alcohol Act on Truancy, baseline specification")
+```
+
+#### \[Logit model\]
+
+```{r}
+#fe logit raw
+fe_logit_baseline <- feglm(truant ~ i(survey_year, fixest_treatment, ref = 2010) | country + survey_year, data = sdd_salsus_all, family = binomial(link="logit"), vcov = "hetero")
+summary(fe_logit_baseline)
+
+iplot(fe_logit_baseline, ref.line = 0,
+      xlab = "Year",
+      ylab = "Effect on truant (pp, ref=2010)",
+      main = "Logit Event-study no control")
+```
+
+### Specification with controls for adolescents' characteristics
+
+#### \[Linear model\]
+
+```{r}
+#fe linear with controls for characteristics
+fe_linear_character_controls <- feols(truant ~ survey_year + gender + young_old + i(survey_year, fixest_treatment, ref = 2010) | country + survey_year, data = sdd_salsus_all, vcov = "hetero")
+summary(fe_linear_character_controls)
+
+iplot(fe_linear_character_controls, ref.line = 0,
+      xlab = "Year",
+      ylab = "Effect on truant (pp, ref=2010)",
+      main = "LPM Event-study controls for gender and young/old")
+```
+
+#### \[Probit model\]
+
+```{r}
+#fe probit with controls for characteristics
+fe_probit_character_controls <- feglm(truant ~ survey_year + gender + young_old + i(survey_year, fixest_treatment, ref = 2010) | country + survey_year, data = sdd_salsus_all, family = "probit", vcov = "hetero")
+summary(fe_probit_character_controls)
+
+iplot(fe_probit_character_controls, ref.line = 0,
+      xlab = "Year",
+      ylab = "Effect on truant (pp, ref=2010)",
+      main = "Event-study: 2010 Alcohol Act on Truancy, characteristic control")
+```
+
+#### \[Logit model\]
+
+```{r}
+#fe logit with controls for characteristics
+fe_logit_character_controls <- feglm(truant ~ survey_year + gender + young_old + i(survey_year, fixest_treatment, ref = 2010) | country + survey_year, data = sdd_salsus_all, family = "logit", vcov = "hetero")
+summary(fe_logit_character_controls)
+
+iplot(fe_logit_character_controls, ref.line = 0,
+      xlab = "Year",
+      ylab = "Effect on truant (pp, ref=2010)",
+      main = "Logit event-study controls for gender and young/old")
+```
+
+### Specification with controls for characteristics and risk behaviour
+
+#### \[Linear model\]
+
+```{r}
+#fe linear with controls for characteristics and risky behaviour
+fe_linear_controls <- feols(truant ~ survey_year + gender + young_old + smokernow + druguse + i(survey_year, fixest_treatment, ref = 2010) | country + survey_year, data = sdd_salsus_all, vcov = "hetero")
+summary(fe_linear_controls)
+
+iplot(fe_linear_controls, ref.line = 0,
+      xlab = "Year",
+      ylab = "Effect on truant (pp, ref=2010)",
+      main = "LPM event-study controls for gender, young/old and substance use")
+```
+
+#### \[Probit model\]
+
+```{r}
+#fe probit with controls for characteristics and risky behaviour
+fe_probit_controls <- feglm(truant ~ survey_year + gender + young_old + smokernow + druguse + i(survey_year, fixest_treatment, ref = 2010) | country + survey_year, data = sdd_salsus_all, family = "probit", vcov = "hetero")
+summary(fe_probit_controls)
+
+iplot(fe_probit_controls, ref.line = 0,
+      xlab = "Year",
+      ylab = "Effect on truant (pp, ref=2010)",
+      main = "Probit event-study controls for gender, young/old and substance use")
+```
+
+#### \[Logit model\]
+
+```{r}
+#fe logit with controls for characteristics and risky behaviour
+fe_logit_controls <- feglm(truant ~ survey_year + gender + young_old + smokernow + druguse + i(survey_year, fixest_treatment, ref = 2010) | country + survey_year, data = sdd_salsus_all, family = "logit", vcov = "hetero")
+summary(fe_logit_controls)
+
+iplot(fe_logit_controls, ref.line = 0,
+      xlab = "Year",
+      ylab = "Effect on truant (pp, ref=2010)",
+      main = "Logit event-study controls for gender, young/old and substance use")
+```
+
+### Alternative truancy recoding
+
+```{r}
+#probit no control
+alt_probit_baseline <- feglm(alternative_truant ~ i(survey_year, fixest_treatment, ref = 2010) | country + survey_year, data = sdd_salsus_all, family = binomial(link="probit"), vcov = "hetero")
+summary(alt_probit_baseline)
+
+iplot(alt_probit_baseline, ref.line = 0,
+      xlab = "Year",
+      ylab = "Effect on truant (pp, ref=2010)",
+      main = "Probit event-study alternative truancy no control")
+
+#probit with controls for characteristics
+alt_probit_character_controls <- feglm(alternative_truant ~ survey_year + gender + young_old + i(survey_year, fixest_treatment, ref = 2010) | country + survey_year, data = sdd_salsus_all, family = "probit", vcov = "hetero")
+summary(alt_probit_character_controls)
+
+iplot(alt_probit_character_controls, ref.line = 0,
+      xlab = "Year",
+      ylab = "Effect on truant (pp, ref=2010)",
+      main = "Probit event-study alternative truancy control for gender, young/old")
+
+#probit full control
+#fe probit with controls for characteristics and risky behaviour
+alt_probit_controls <- feglm(alternative_truant ~ survey_year + gender + young_old + smokernow + druguse + i(survey_year, fixest_treatment, ref = 2010) | country + survey_year, data = sdd_salsus_all, family = "probit", vcov = "hetero")
+summary(alt_probit_controls)
+
+iplot(alt_probit_controls, ref.line = 0,
+      xlab = "Year",
+      ylab = "Effect on truant (pp, ref=2010)",
+      main = "Probit alternative truancy event-study full control")
+```
+
+## Joint-significance test for the ES coeffcients
+
+```{r}
+#wald(fe_linear_baseline, keep = "year::(2000|2002|2004|2006|2008):fixest_treatment")
+wald(fe_probit_baseline, keep = "year::(2000|2002|2004|2006|2008):fixest_treatment")
+#wald(fe_logit_baseline, keep = "year::(2000|2002|2004|2006|2008):fixest_treatment")
+#wald(fe_linear_character_controls, keep = "year::(2000|2002|2004|2006|2008):fixest_treatment")
+wald(fe_probit_character_controls, keep = "year::(2000|2002|2004|2006|2008):fixest_treatment")
+#wald(fe_logit_character_controls, keep = "year::(2000|2002|2004|2006|2008):fixest_treatment")
+#wald(fe_linear_controls, keep = "year::(2000|2002|2004|2006|2008):fixest_treatment")
+#wald(fe_probit_controls, keep = "year::(2000|2002|2004|2006|2008):fixest_treatment")
+#wald(fe_logit_controls, keep = "year::(2000|2002|2004|2006|2008):fixest_treatment")
+```
+
+## First stage results
+
+### DiD estimation
+
+```{r}
+#binary linear everdrink raw
+first_stage_did_everdrink_linear_raw <- feols(everdrink ~ did | country + survey_year, data = sdd_salsus_all, vcov = "hetero")
+
+#continuous linear weeklydrink raw
+first_stage_did_weekly_linear_raw <- feols(weekly_drinker ~ did | country + survey_year, data = sdd_salsus_all, vcov = "hetero")
+
+#binary linear everdrink control
+first_stage_did_everdrink_linear_control <- feols(everdrink ~ did + gender + young_old | country + survey_year, data = sdd_salsus_all, vcov = "hetero")
+
+#continuous linear weeklydrink control
+first_stage_did_weekly_linear_control <- feols(weekly_drinker ~ did + gender + young_old | country + survey_year, data = sdd_salsus_all, vcov = "hetero")
+
+summary(first_stage_did_everdrink_linear_raw)
+summary(first_stage_did_weekly_linear_raw)
+summary(first_stage_did_everdrink_linear_control)
+summary(first_stage_did_weekly_linear_control)
+```
+
+```{r}
+write.csv(sdd_salsus_all, file = "sdd_salsus_final_harmonised.csv")
+```
